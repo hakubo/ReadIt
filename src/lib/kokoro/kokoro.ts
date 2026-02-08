@@ -1,5 +1,5 @@
 import { getModel } from "@/lib/resources";
-import type { LangId } from "@/lib/resources";
+import type { LangId, ShapedVoice } from "@/lib/resources";
 import { acceleration } from "./detectWebGPU";
 import { loadVoice } from "./combineVoices";
 import { preprocessText, type TextProcessorChunk } from "./textProcessor";
@@ -19,7 +19,7 @@ let preloadPromise: Promise<void> | null = null;
 
 // Cache voice data to avoid re-fetching/reshaping on every sentence
 let cachedVoiceId = "";
-let cachedVoice: number[][][] | null = null;
+let cachedVoice: ShapedVoice | null = null;
 
 export function isSessionCached(): boolean {
   return cachedSession !== null;
@@ -107,7 +107,7 @@ export async function generateVoice(params: {
     tokensPerChunk,
   );
 
-  let voice: number[][][];
+  let voice: ShapedVoice;
   if (cachedVoice && cachedVoiceId === params.voiceId) {
     voice = cachedVoice;
   } else {
@@ -140,7 +140,9 @@ export async function generateVoice(params: {
       console.log({ type: chunk.type, content: chunk.content });
 
       const tokens = chunk.tokens;
-      const ref_s = voice[tokens.length - 1][0];
+      const stride = voice.inner * voice.length;
+      const offset = (tokens.length - 1) * stride;
+      const ref_s = voice.data.subarray(offset, offset + voice.length);
       const paddedTokens = [0, ...tokens, 0];
       const input_ids = new ort.Tensor("int64", paddedTokens, [
         1,
