@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS, DEFAULT_TEXT_REPLACEMENTS, type TTSSettings, type Sit
 export async function getGlobalSettings(): Promise<TTSSettings> {
   try {
     const result = await chrome.storage.sync.get("settings");
-    const settings = { ...DEFAULT_SETTINGS, ...result.settings };
+    const settings = { ...DEFAULT_SETTINGS, ...(result.settings as Partial<TTSSettings>) };
     if (!settings.textReplacements) {settings.textReplacements = DEFAULT_TEXT_REPLACEMENTS;}
     return settings;
   } catch {
@@ -17,7 +17,7 @@ export async function getDomainSettings(
   try {
     const key = `site:${hostname}`;
     const result = await chrome.storage.local.get(key);
-    const prefs: SitePrefs | undefined = result[key];
+    const prefs = result[key] as SitePrefs | undefined;
     if (!prefs?.settings) {return null;}
     const settings = { ...prefs.settings };
     if (!settings.textReplacements) {settings.textReplacements = DEFAULT_TEXT_REPLACEMENTS;}
@@ -45,7 +45,7 @@ export async function saveDomainSettings(
 ): Promise<void> {
   const key = `site:${hostname}`;
   const result = await chrome.storage.local.get(key);
-  const prefs: SitePrefs = result[key] || {};
+  const prefs = (result[key] as SitePrefs | undefined) ?? ({} as SitePrefs);
   prefs.settings = settings;
   await chrome.storage.local.set({ [key]: prefs });
 }
@@ -53,7 +53,7 @@ export async function saveDomainSettings(
 export async function clearDomainSettings(hostname: string): Promise<void> {
   const key = `site:${hostname}`;
   const result = await chrome.storage.local.get(key);
-  const prefs: SitePrefs = result[key];
+  const prefs = result[key] as SitePrefs | undefined;
   if (prefs) {
     delete prefs.settings;
     await chrome.storage.local.set({ [key]: prefs });
