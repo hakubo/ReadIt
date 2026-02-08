@@ -1,0 +1,169 @@
+import { getModel } from "@/lib/resources";
+import type { LangId } from "@/lib/resources";
+import { acceleration } from "./detectWebGPU";
+import { combineVoices } from "./combineVoices";
+import { preprocessText, type TextProcessorChunk } from "./textProcessor";
+import { trimWaveform } from "./trimWaveform";
+import { getOnnxRuntime } from "./getOnnxRuntime";
+import { createWavBuffer } from "./createWavBuffer";
+import { parseVoiceFormula } from "./voiceFormula";
+
+const MODEL_CONTEXT_WINDOW = 512;
+const SAMPLE_RATE = 24000; // sample rate in Hz
+const MODEL_ID = "model"; // fp32 — always use full precision
+
+// Cache ONNX session to avoid re-parsing the model on every call
+let cachedSession: Awaited<
+  ReturnType<typeof import("onnxruntime-web/webgpu").InferenceSession.create>
+> | null = null;
+
+// Cache combined voice data to avoid re-fetching/reshaping on every sentence
+let cachedVoiceFormula = "";
+let cachedCombinedVoice: number[][][] | null = null;
+
+export function isSessionCached(): boolean {
+  return cachedSession !== null;
+}
+
+/**
+ * Releases the ONNX session and cached voice data to free memory.
+ * The model will be re-loaded on the next generateVoice() call.
+ */
+export async function releaseModel(): Promise<void> {
+  // Capture and null out synchronously so concurrent preloadModel()
+  // calls see null and create a fresh session instead of reusing
+  // the one being released.
+  const session = cachedSession;
+  cachedSession = null;
+  cachedVoiceFormula = "";
+  cachedCombinedVoice = null;
+
+  if (session) {
+    try {
+      await session.release();
+    } catch (e) {
+      console.warn("Error releasing ONNX session:", e);
+    }
+  }
+}
+
+/**
+ * Preloads the ONNX model so it's ready when the user first triggers TTS.
+ */
+export async function preloadModel(
+  onProgress?: (downloaded: number, total: number) => void,
+): Promise<void> {
+  if (cachedSession) {return;}
+  const ort = getOnnxRuntime();
+  const modelBuffer = await getModel(MODEL_ID, onProgress);
+  cachedSession = await ort.InferenceSession.create(modelBuffer, {
+    executionProviders: [acceleration],
+    preferredOutputLocation: "cpu-pinned",
+  });
+  console.log(`Model loaded (${acceleration})`);
+}
+
+/**
+ * Generates a voice from a given text.
+ *
+ * The raw text is preprocessed so that silence markers are detected before phonemization.
+ * For text segments the phonemizer is called, then punctuation splitting and token generation are applied.
+ * Silence chunks produce silent waveforms.
+ *
+ * The voice formula is parsed into an array of voice weights.
+ *
+ * @param params - Generation parameters.
+ * @param params.text - The input text.
+ * @param params.lang - The language ID (for phonemization).
+ * @param params.voiceFormula - The voice formula.
+ * @returns WAV buffer.
+ */
+export async function generateVoice(params: {
+  text: string;
+  lang: LangId | string;
+  voiceFormula: string;
+}): Promise<{ buffer: ArrayBuffer; waveform: Float32Array; mimeType: string }> {
+  if (!cachedSession) {
+    await preloadModel();
+  }
+  const session = cachedSession!;
+
+  const ort = getOnnxRuntime();
+
+  const tokensPerChunk = MODEL_CONTEXT_WINDOW - 2;
+  const chunks: TextProcessorChunk[] = await preprocessText(
+    params.text,
+    params.lang,
+    tokensPerChunk,
+  );
+
+  let combinedVoice: number[][][];
+  if (cachedCombinedVoice && cachedVoiceFormula === params.voiceFormula) {
+    combinedVoice = cachedCombinedVoice;
+  } else {
+    const voices = parseVoiceFormula(params.voiceFormula);
+    combinedVoice = await combineVoices(voices);
+    cachedVoiceFormula = params.voiceFormula;
+    cachedCombinedVoice = combinedVoice;
+  }
+
+  const waveforms: Float32Array[] = [];
+  let waveformsLen = 0;
+
+  // Process each chunk based on its type.
+  for (const chunk of chunks) {
+    if (chunk.type === "silence") {
+      console.log(chunk);
+
+      const silenceLength = Math.floor(chunk.durationSeconds * SAMPLE_RATE);
+      const silenceWave = new Float32Array(silenceLength);
+      waveforms.push(silenceWave);
+      waveformsLen += silenceLength;
+    }
+
+    if (chunk.type === "text") {
+      const tokensLength = chunk.tokens?.length ?? 0;
+      if (tokensLength < 1) {
+        console.log("Skipping chunk with no tokens");
+        continue;
+      }
+
+      console.log({ type: chunk.type, content: chunk.content });
+
+      const tokens = chunk.tokens;
+      const ref_s = combinedVoice[tokens.length - 1][0];
+      const paddedTokens = [0, ...tokens, 0];
+      const input_ids = new ort.Tensor("int64", paddedTokens, [
+        1,
+        paddedTokens.length,
+      ]);
+      const style = new ort.Tensor("float32", ref_s, [1, ref_s.length]);
+      // Fixed speed because speed should be implemented as post-processing
+      // instead of being a model input to get better results.
+      const speed = new ort.Tensor("float32", [1], [1]);
+
+      // Get the raw waveform and trim extra silence duration.
+      const result = await session.run({ input_ids, style, speed });
+      let waveform = (await result.waveform.getData()) as Float32Array;
+      result.waveform.dispose();
+      waveform = trimWaveform(waveform);
+
+      waveforms.push(waveform);
+      waveformsLen += waveform.length;
+    }
+  }
+
+  if (waveforms.length === 0) {
+    throw new Error("No waveforms generated");
+  }
+
+  const finalWaveform = new Float32Array(waveformsLen);
+  let offset = 0;
+  for (const waveform of waveforms) {
+    finalWaveform.set(waveform, offset);
+    offset += waveform.length;
+  }
+
+  const wavBuffer = createWavBuffer(finalWaveform, SAMPLE_RATE);
+  return { buffer: wavBuffer, waveform: finalWaveform, mimeType: "audio/wav" };
+}
