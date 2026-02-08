@@ -5,7 +5,6 @@ import { loadVoice } from "./combineVoices";
 import { preprocessText, type TextProcessorChunk } from "./textProcessor";
 import { trimWaveform } from "./trimWaveform";
 import { getOnnxRuntime } from "./getOnnxRuntime";
-import { createWavBuffer } from "./createWavBuffer";
 
 const MODEL_CONTEXT_WINDOW = 512;
 const SAMPLE_RATE = 24000; // sample rate in Hz
@@ -70,13 +69,13 @@ export async function preloadModel(
  * @param params - Generation parameters.
  * @param params.text - The input text.
  * @param params.lang - The language ID (for phonemization).
- * @param params.voiceId - The voice ID.
+ * @param params.voiceFormula - The voice formula.
  * @returns WAV buffer.
  */
 export async function generateVoice(params: {
   text: string;
   lang: LangId | string;
-  voiceId: string;
+  voiceFormula: string;
 }): Promise<{ buffer: ArrayBuffer; waveform: Float32Array; mimeType: string }> {
   if (!cachedSession) {
     await preloadModel();
@@ -158,6 +157,5 @@ export async function generateVoice(params: {
     offset += waveform.length;
   }
 
-  const wavBuffer = createWavBuffer(finalWaveform, SAMPLE_RATE);
-  return { buffer: wavBuffer, waveform: finalWaveform, mimeType: "audio/wav" };
+  return { waveform: finalWaveform };
 }
