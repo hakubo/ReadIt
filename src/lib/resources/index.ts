@@ -52,8 +52,20 @@ export async function isVoiceCached(id: VoiceId | string): Promise<boolean> {
 }
 
 /**
- * same as getVoiceFile but reshapes the data into a 3D array with
- * this shape: [number of chunks, 1, 256]
+ * Voice data stored as a flat Float32Array with shape metadata.
+ * Logical shape is [chunks, inner, length] (e.g. [N, 1, 256]).
+ * Access element [i][j][k] via data[i * inner * length + j * length + k].
+ */
+export interface ShapedVoice {
+  data: Float32Array;
+  chunks: number;
+  inner: number;
+  length: number;
+}
+
+/**
+ * same as getVoiceFile but returns a flat Float32Array with shape metadata
+ * representing a 3D array with shape: [number of chunks, 1, 256]
  *
  * This shape is required by the model for inference.
  *
@@ -61,17 +73,12 @@ export async function isVoiceCached(id: VoiceId | string): Promise<boolean> {
  */
 export async function getShapedVoiceFile(
   id: VoiceId | string
-): Promise<number[][][]> {
+): Promise<ShapedVoice> {
   const voice = await getVoiceFile(id);
-  const voiceArray = new Float32Array(voice);
-  const voiceArrayLen = voiceArray.length;
+  const data = new Float32Array(voice);
+  const length = 256;
+  const inner = 1;
+  const chunks = Math.ceil(data.length / (inner * length));
 
-  const reshaped: number[][][] = [];
-  for (let from = 0; from < voiceArray.length; from += 256) {
-    const to = Math.min(from + 256, voiceArrayLen);
-    const chunk = Array.from(voiceArray.slice(from, to));
-    reshaped.push([chunk]);
-  }
-
-  return reshaped;
+  return { data, chunks, inner, length };
 }
