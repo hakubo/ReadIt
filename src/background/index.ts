@@ -9,7 +9,7 @@ const OFFSCREEN_IDLE_MS = 10_000; // Close offscreen 10s after generation ends
 // Restore activeTabId from session storage (survives service worker restarts)
 chrome.storage.session.get("activeTabId").then((result) => {
   if (result.activeTabId != null && activeTabId === null) {
-    activeTabId = result.activeTabId;
+    activeTabId = result.activeTabId as number;
   }
 });
 
@@ -127,7 +127,7 @@ chrome.action.onClicked.addListener(async (tab) => {
 
   const key = `site:${hostname}`;
   const result = await chrome.storage.local.get(key);
-  const prefs = result[key] || {};
+  const prefs = (result[key] as Record<string, unknown> | undefined) ?? {};
   const wasEnabled = prefs.enabled !== false;
   const nowEnabled = !wasEnabled;
 
