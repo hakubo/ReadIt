@@ -10,17 +10,24 @@ function getEspeakWasmUrl(): string {
   return "https://cdn.jsdelivr.net/npm/espeak-ng@1.0.2/dist/espeak-ng.wasm";
 }
 
-// Cache the WASM binary so espeak-ng doesn't re-fetch it on every call
-let cachedWasmBinary: ArrayBuffer | null = null;
+// Cache the compiled WebAssembly.Module so we only compile the WASM binary once.
+// WebAssembly compilation (binary → native code) is the expensive step.
+// Instantiation from a pre-compiled module (memory allocation + import linking) is much cheaper.
+let cachedWasmModule: WebAssembly.Module | null = null;
 
-async function getWasmBinary(): Promise<ArrayBuffer> {
-  if (cachedWasmBinary) {return cachedWasmBinary;}
+async function getWasmModule(): Promise<WebAssembly.Module> {
+  if (cachedWasmModule) {
+    return cachedWasmModule;
+  }
   const response = await fetch(getEspeakWasmUrl());
   if (!response.ok) {
-    throw new Error(`Failed to fetch espeak WASM binary: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Failed to fetch espeak WASM binary: ${response.status} ${response.statusText}`
+    );
   }
-  cachedWasmBinary = await response.arrayBuffer();
-  return cachedWasmBinary;
+  const wasmBinary = await response.arrayBuffer();
+  cachedWasmModule = await WebAssembly.compile(wasmBinary);
+  return cachedWasmModule;
 }
 
 /**
@@ -56,11 +63,20 @@ export async function phonemize(
     text,
   ];
 
-  const wasmBinary = await getWasmBinary();
+  const wasmModule = await getWasmModule();
 
-  // Pass cached wasmBinary so espeak-ng skips fetching the .wasm file
+  // Use instantiateWasm hook to skip WASM compilation on every call.
+  // The Emscripten module's default path re-compiles from binary each time.
+  // By providing a pre-compiled WebAssembly.Module, we only pay the
+  // instantiation cost (fresh memory + FS setup), not the compilation cost.
   const espeak = await ESpeakNg({
-    wasmBinary: wasmBinary.slice(0),
+    instantiateWasm(
+      imports: WebAssembly.Imports,
+      successCallback: (instance: WebAssembly.Instance) => void
+    ) {
+      WebAssembly.instantiate(wasmModule, imports).then(successCallback);
+      return {};
+    },
     arguments: espeakArgs,
   });
 
