@@ -1,8 +1,6 @@
-import { modelsMap, type ModelId } from "./models";
 import { voicesMap, type VoiceId } from "./voices";
 import { getFileFromUrl } from "./getFileFromUrl";
 
-export * from "./models";
 export * from "./voices";
 export * from "./langs";
 
@@ -15,18 +13,9 @@ const downloadUrl =
  * @param id The id of the model
  */
 export async function getModel(
-  id: ModelId | string,
   onProgress?: (downloaded: number, total: number) => void
 ): Promise<ArrayBuffer> {
-  let modelId = modelsMap["model"].id;
-  for (const key of Object.keys(modelsMap)) {
-    if (key === id) {
-      modelId = modelsMap[id as ModelId].id;
-      break;
-    }
-  }
-
-  const url = `${downloadUrl}/onnx/${modelId}.onnx`;
+  const url = `${downloadUrl}/onnx/model.onnx`;
   return await getFileFromUrl(url, onProgress);
 }
 

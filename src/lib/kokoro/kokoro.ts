@@ -10,8 +10,6 @@ import { parseVoiceFormula } from "./voiceFormula";
 
 const MODEL_CONTEXT_WINDOW = 512;
 const SAMPLE_RATE = 24000; // sample rate in Hz
-const MODEL_ID = "model"; // fp32 — always use full precision
-
 // Cache ONNX session to avoid re-parsing the model on every call
 let cachedSession: Awaited<
   ReturnType<typeof import("onnxruntime-web/webgpu").InferenceSession.create>
@@ -55,7 +53,7 @@ export async function preloadModel(
 ): Promise<void> {
   if (cachedSession) {return;}
   const ort = getOnnxRuntime();
-  const modelBuffer = await getModel(MODEL_ID, onProgress);
+  const modelBuffer = await getModel(onProgress);
   cachedSession = await ort.InferenceSession.create(modelBuffer, {
     executionProviders: [acceleration],
     preferredOutputLocation: "cpu-pinned",
