@@ -2285,7 +2285,7 @@ chrome.runtime.onMessage.addListener((message) => {
 
   if (message.type === "TTS_SENTENCE_WAV") {
     const idx = message.index as number;
-    const wavData = message.wavData as ArrayBuffer;
+    const wavData = new Uint8Array(message.wavBytes as number[]).buffer;
     const duration = message.duration as number;
 
     // Ensure arrays are large enough

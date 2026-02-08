@@ -60,6 +60,23 @@ if (message.type === "PLAYER_SKIP_FORWARD") {
 // Player commands are received directly by offscreen, no forwarding needed
 ```
 
+### Binary Data in Chrome Messaging
+
+`chrome.runtime.sendMessage()` and `chrome.tabs.sendMessage()` are **JSON-serialized** — `ArrayBuffer` and typed arrays are silently dropped. Convert to a plain number array for transit, reconstruct on the receiving end:
+
+```typescript
+// Sender (offscreen)
+const wavData = createWavBuffer(waveform, sampleRate);
+chrome.runtime.sendMessage({
+  wavBytes: Array.from(new Uint8Array(wavData)),
+});
+
+// Receiver (content script)
+const wavData = new Uint8Array(message.wavBytes).buffer;
+```
+
+`window.postMessage()` (content script ↔ player iframe) uses structured cloning and handles `ArrayBuffer` natively — no conversion needed there.
+
 ### Audio Playback Speed
 
 Use `audio.playbackRate` instead of ffmpeg for speed control. FFmpeg blob workers are blocked by CSP in extensions.
@@ -228,3 +245,5 @@ Offscreen generates 15 sentences ahead. Content script sends `ADVANCE_GENERATION
 7. **Sentence count mismatch** - Process text per-sentence AFTER splitting (not before), to maintain 1:1 mapping between highlight indices and audio indices.
 
 8. **Cache check returns wrong results** - `caches` API in content script uses page origin. Always check via background service worker.
+
+9. **ArrayBuffer lost in Chrome messaging** - `chrome.runtime.sendMessage` is JSON-serialized. Use `Array.from(new Uint8Array(buffer))` to send, `new Uint8Array(arr).buffer` to receive. `window.postMessage` (to player iframe) handles `ArrayBuffer` natively.

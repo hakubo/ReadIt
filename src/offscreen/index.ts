@@ -41,12 +41,12 @@ async function generateAndSendWav(index: number, sentence: string, lang: string,
   const duration = withSilence.length / SAMPLE_RATE;
   const wavData = createWavBuffer(withSilence as Float32Array<ArrayBuffer>, SAMPLE_RATE);
 
-  // Send ArrayBuffer directly via structured cloning (Chrome 118+),
-  // avoiding the 33% overhead of base64 encoding.
+  // Chrome extension messaging is JSON-serialized, so ArrayBuffer can't
+  // be sent directly. Convert to a plain number array for transit.
   chrome.runtime.sendMessage({
     type: "TTS_SENTENCE_WAV",
     index,
-    wavData,
+    wavBytes: Array.from(new Uint8Array(wavData)),
     duration,
   });
 }
