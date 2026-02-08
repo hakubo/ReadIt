@@ -69,14 +69,14 @@ export async function preloadModel(
  * @param params - Generation parameters.
  * @param params.text - The input text.
  * @param params.lang - The language ID (for phonemization).
- * @param params.voiceFormula - The voice formula.
- * @returns WAV buffer.
+ * @param params.voiceId - The voice ID.
+ * @returns Generated waveform.
  */
 export async function generateVoice(params: {
   text: string;
   lang: LangId | string;
-  voiceFormula: string;
-}): Promise<{ buffer: ArrayBuffer; waveform: Float32Array; mimeType: string }> {
+  voiceId: string;
+}): Promise<{ waveform: Float32Array }> {
   if (!cachedSession) {
     await preloadModel();
   }
