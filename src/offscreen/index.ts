@@ -250,9 +250,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 // --- Voice preview ---
 let previewAudio: HTMLAudioElement | null = null;
+let previewBlobUrl: string | null = null;
+
+function cleanupPreviewAudio() {
+  if (previewAudio) {
+    previewAudio.pause();
+    previewAudio.src = "";
+    previewAudio = null;
+  }
+  if (previewBlobUrl) {
+    URL.revokeObjectURL(previewBlobUrl);
+    previewBlobUrl = null;
+  }
+}
 
 async function handlePreviewVoice(voiceId: string) {
-  if (previewAudio) { previewAudio.pause(); previewAudio.src = ""; }
+  cleanupPreviewAudio();
 
   if (isGenerating) {
     chrome.runtime.sendMessage({ type: "PREVIEW_STATE", voiceId, playing: false });
@@ -270,14 +283,15 @@ async function handlePreviewVoice(voiceId: string) {
     });
     const wavBuffer = createWavBuffer(result.waveform as Float32Array<ArrayBuffer>, SAMPLE_RATE);
     const blob = new Blob([wavBuffer], { type: "audio/wav" });
-    const url = URL.createObjectURL(blob);
-    previewAudio = new Audio(url);
+    previewBlobUrl = URL.createObjectURL(blob);
+    previewAudio = new Audio(previewBlobUrl);
     previewAudio.addEventListener("ended", () => {
-      URL.revokeObjectURL(url);
+      cleanupPreviewAudio();
       chrome.runtime.sendMessage({ type: "PREVIEW_STATE", voiceId, playing: false });
     });
     await previewAudio.play();
   } catch {
+    cleanupPreviewAudio();
     chrome.runtime.sendMessage({ type: "PREVIEW_STATE", voiceId, playing: false });
   }
   isGenerating = false;
