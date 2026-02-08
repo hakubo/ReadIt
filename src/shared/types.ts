@@ -32,7 +32,16 @@ export interface TTSSettings {
   autoScroll: boolean;
   theme: "light" | "dark";
   textReplacements: TextReplacementRule[];
+  noiseSelectors: string[];
 }
+
+export const DEFAULT_NOISE_SELECTORS: string[] = [
+  "nav", "footer", "header", "aside",
+  "[role='navigation']", "[role='banner']", "[role='contentinfo']", "[role='complementary']",
+  ".sidebar", ".nav", ".menu", ".footer", ".header", ".ad", ".ads", ".advertisement",
+  ".comment", ".comments", ".widget", ".social", ".share", ".related",
+  "script", "style", "noscript", "iframe", "svg", "form",
+];
 
 export const DEFAULT_SETTINGS: TTSSettings = {
   voices: ["af_heart"],
@@ -42,6 +51,7 @@ export const DEFAULT_SETTINGS: TTSSettings = {
   autoScroll: true,
   theme: "dark",
   textReplacements: DEFAULT_TEXT_REPLACEMENTS,
+  noiseSelectors: DEFAULT_NOISE_SELECTORS,
 };
 
 export interface SitePrefs {

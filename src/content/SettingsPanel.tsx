@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Play, Loader } from "lucide-react";
 import { voices } from "@/lib/resources";
-import { HIGHLIGHT_COLORS, DEFAULT_TEXT_REPLACEMENTS, type TTSSettings, type TextReplacementRule } from "@/shared/types";
+import { HIGHLIGHT_COLORS, DEFAULT_TEXT_REPLACEMENTS, DEFAULT_NOISE_SELECTORS, type TTSSettings, type TextReplacementRule } from "@/shared/types";
 import {
   getGlobalSettings,
   getDomainSettings,
@@ -40,6 +40,10 @@ interface SettingsPanelProps {
   onSetContentSelector?: (selector: string) => void;
   onSelectorFocus?: () => void;
   onSelectorBlur?: () => void;
+  onNoisePreview?: (selector: string) => void;
+  onNoisePreviewHide?: () => void;
+  onPickNoise?: () => void;
+  noiseMatchCount?: (selector: string) => number;
 }
 
 function formatDomain(domain: string): string {
@@ -47,7 +51,7 @@ function formatDomain(domain: string): string {
   return d.length > 28 ? d.slice(0, 26) + "\u2026" : d;
 }
 
-export function SettingsPanel({ position, onClose, domain, theme, visible = true, onPickContent, contentSelector, onClearContentSelector, onSetContentSelector, onSelectorFocus, onSelectorBlur }: SettingsPanelProps) {
+export function SettingsPanel({ position, onClose, domain, theme, visible = true, onPickContent, contentSelector, onClearContentSelector, onSetContentSelector, onSelectorFocus, onSelectorBlur, onNoisePreview, onNoisePreviewHide, onPickNoise, noiseMatchCount }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<"default" | "domain">("default");
   const [globalSettings, setGlobalSettings] = useState<TTSSettings | null>(null);
   const [domainSettings, setDomainSettings] = useState<TTSSettings | null>(null);
@@ -58,6 +62,9 @@ export function SettingsPanel({ position, onClose, domain, theme, visible = true
   const [downloadingVoice, setDownloadingVoice] = useState<string | null>(null);
   const [rulesExpanded, setRulesExpanded] = useState(false);
   const [ruleErrors, setRuleErrors] = useState<Set<number>>(new Set());
+  const [noiseExpanded, setNoiseExpanded] = useState(false);
+  const [noiseSelectorInput, setNoiseSelectorInput] = useState("");
+  const [activePill, setActivePill] = useState<number | null>(null);
   const prevVisible = useRef(false);
 
   // Compute selector match count live (always fresh)
@@ -411,6 +418,146 @@ export function SettingsPanel({ position, onClose, domain, theme, visible = true
                 onClick={() => {
                   setRuleErrors(new Set());
                   currentSave({ ...settings, textReplacements: DEFAULT_TEXT_REPLACEMENTS });
+                }}
+              >
+                Reset to defaults
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="settings-rules-section">
+          <button
+            className="settings-rules-toggle"
+            onClick={() => {
+              const next = !noiseExpanded;
+              setNoiseExpanded(next);
+              if (!next) {
+                setActivePill(null);
+                onNoisePreviewHide?.();
+              }
+            }}
+          >
+            <span className={`settings-rules-chevron${noiseExpanded ? " open" : ""}`}>&#9654;</span>
+            Noise selectors ({settings.noiseSelectors.length})
+          </button>
+          {noiseExpanded && (
+            <>
+              <div className="settings-noise-pills">
+                {settings.noiseSelectors.map((sel, i) => {
+                  const count = noiseMatchCount?.(sel) ?? 0;
+                  return (
+                    <span
+                      key={i}
+                      className={`settings-noise-pill${activePill === i ? " active" : ""}`}
+                      onClick={() => {
+                        if (activePill === i) {
+                          setActivePill(null);
+                          onNoisePreviewHide?.();
+                        } else {
+                          setActivePill(i);
+                          onNoisePreview?.(sel);
+                        }
+                      }}
+                    >
+                      <span className="noise-pill-text">{sel}</span>
+                      {count > 0 && (
+                        <span className={`noise-match-count${count > 0 ? " has-matches" : ""}`}>
+                          {count}
+                        </span>
+                      )}
+                      <button
+                        className="noise-pill-remove"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (activePill === i) {
+                            setActivePill(null);
+                            onNoisePreviewHide?.();
+                          } else if (activePill !== null && activePill > i) {
+                            setActivePill(activePill - 1);
+                          }
+                          const updated = settings.noiseSelectors.filter((_, j) => j !== i);
+                          currentSave({ ...settings, noiseSelectors: updated });
+                        }}
+                      >
+                        &times;
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="settings-noise-add">
+                <input
+                  className="settings-rule-input"
+                  type="text"
+                  value={noiseSelectorInput}
+                  placeholder="e.g. .toc, #sidebar, aside"
+                  spellCheck={false}
+                  onFocus={() => {
+                    onSelectorFocus?.();
+                    const val = noiseSelectorInput.trim();
+                    if (val) {
+                      onNoisePreview?.(val);
+                    } else {
+                      onNoisePreview?.("");
+                    }
+                  }}
+                  onBlur={() => {
+                    onSelectorBlur?.();
+                    onNoisePreviewHide?.();
+                  }}
+                  onChange={(e) => {
+                    setNoiseSelectorInput(e.target.value);
+                    const val = e.target.value.trim();
+                    if (val) {
+                      onNoisePreview?.(val);
+                    } else {
+                      onNoisePreview?.("");
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const val = noiseSelectorInput.trim();
+                      if (val && !settings.noiseSelectors.includes(val)) {
+                        currentSave({ ...settings, noiseSelectors: [...settings.noiseSelectors, val] });
+                        setNoiseSelectorInput("");
+                        onNoisePreviewHide?.();
+                      }
+                    }
+                  }}
+                />
+                <button
+                  className="settings-noise-add-btn"
+                  onClick={() => {
+                    const val = noiseSelectorInput.trim();
+                    if (val && !settings.noiseSelectors.includes(val)) {
+                      currentSave({ ...settings, noiseSelectors: [...settings.noiseSelectors, val] });
+                      setNoiseSelectorInput("");
+                      onNoisePreviewHide?.();
+                    }
+                  }}
+                >
+                  Add
+                </button>
+                <button className="settings-selector-btn" onClick={() => { setActivePill(null); onNoisePreviewHide?.(); onPickNoise?.(); }} title="Pick element">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="3" />
+                    <path d="M11 2v3" /><path d="M11 19v3" />
+                    <path d="M2 11h3" /><path d="M19 11h3" />
+                    <path d="M18.364 5.636l-2.121 2.121" />
+                    <path d="M7.757 16.243l-2.121 2.121" />
+                    <path d="M5.636 5.636l2.121 2.121" />
+                    <path d="M16.243 16.243l2.121 2.121" />
+                  </svg>
+                </button>
+              </div>
+              <button
+                className="settings-rule-reset-btn"
+                onClick={() => {
+                  setActivePill(null);
+                  onNoisePreviewHide?.();
+                  currentSave({ ...settings, noiseSelectors: DEFAULT_NOISE_SELECTORS });
+                  setNoiseSelectorInput("");
                 }}
               >
                 Reset to defaults

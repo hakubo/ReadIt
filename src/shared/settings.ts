@@ -1,10 +1,11 @@
-import { DEFAULT_SETTINGS, DEFAULT_TEXT_REPLACEMENTS, type TTSSettings, type SitePrefs } from "./types";
+import { DEFAULT_SETTINGS, DEFAULT_TEXT_REPLACEMENTS, DEFAULT_NOISE_SELECTORS, type TTSSettings, type SitePrefs } from "./types";
 
 export async function getGlobalSettings(): Promise<TTSSettings> {
   try {
     const result = await chrome.storage.sync.get("settings");
     const settings = { ...DEFAULT_SETTINGS, ...(result.settings as Partial<TTSSettings>) };
     if (!settings.textReplacements) {settings.textReplacements = DEFAULT_TEXT_REPLACEMENTS;}
+    if (!settings.noiseSelectors) {settings.noiseSelectors = DEFAULT_NOISE_SELECTORS;}
     return settings;
   } catch {
     return DEFAULT_SETTINGS;
@@ -21,6 +22,7 @@ export async function getDomainSettings(
     if (!prefs?.settings) {return null;}
     const settings = { ...prefs.settings };
     if (!settings.textReplacements) {settings.textReplacements = DEFAULT_TEXT_REPLACEMENTS;}
+    if (!settings.noiseSelectors) {settings.noiseSelectors = DEFAULT_NOISE_SELECTORS;}
     return settings;
   } catch {
     return null;

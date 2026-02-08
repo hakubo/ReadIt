@@ -1,15 +1,16 @@
 // Content detection: finds the main readable content on a page.
 // Exports pure functions that accept dependencies via parameters.
 
-export const NOISE_SELECTORS = [
-  "nav", "footer", "header", "aside",
-  "[role='navigation']", "[role='banner']", "[role='contentinfo']", "[role='complementary']",
-  ".sidebar", ".nav", ".menu", ".footer", ".header", ".ad", ".ads", ".advertisement",
-  ".comment", ".comments", ".widget", ".social", ".share", ".related",
-  "script", "style", "noscript", "iframe", "svg", "form",
-];
+import { DEFAULT_NOISE_SELECTORS } from "@/shared/types";
 
-export const NOISE_SELECTOR = NOISE_SELECTORS.join(",");
+// Mutable noise selector string, updated via setNoiseSelector() when settings load.
+// ES module live bindings ensure importers always see the latest value.
+export let NOISE_SELECTOR = DEFAULT_NOISE_SELECTORS.join(",");
+
+/** Replace the active noise selector string from a user-configured list. */
+export function setNoiseSelector(selectors: string[]): void {
+  NOISE_SELECTOR = selectors.join(",");
+}
 export const BLOCK_SELECTOR = "p, h1, h2, h3, h4, h5, h6, li, blockquote, figcaption, dt, dd, th, td, pre";
 
 /** Check if an element has a noise ancestor within a given boundary. */
