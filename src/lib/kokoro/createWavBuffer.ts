@@ -5,7 +5,7 @@ import * as wavefile from "wavefile";
  */
 export function createWavBuffer(
   waveform: Float32Array<ArrayBuffer>,
-  sampleRate: number
+  sampleRate: number,
 ): ArrayBuffer {
   const wav = new wavefile.WaveFile();
   wav.fromScratch(1, sampleRate, "32f", waveform);

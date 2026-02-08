@@ -860,7 +860,7 @@ let playerState: PlayerState = {
 let playerIframe: HTMLIFrameElement | null = null;
 let playerReady = false;
 let playerMsgQueue: Record<string, unknown>[] = [];
-let sentenceWavBase64: (string | null)[] = [];
+let sentenceWavData: (ArrayBuffer | null)[] = [];
 let sentenceDurations: number[] = [];
 let currentSentenceIdx = 0;
 let isManuallyNavigating = false;
@@ -1009,7 +1009,7 @@ function handleAudioEnded() {
   const nextIdx = currentSentenceIdx + 1;
   if (nextIdx < totalChunks) {
     currentSentenceElapsed = 0;
-    if (sentenceWavBase64[nextIdx]) {
+    if (sentenceWavData[nextIdx]) {
       currentSentenceIdx = nextIdx;
       playCurrentSentence();
     } else {
@@ -1031,19 +1031,19 @@ function handleAudioEnded() {
 }
 
 function playCurrentSentence() {
-  const wavBase64 = sentenceWavBase64[currentSentenceIdx];
-  if (!wavBase64) {return;}
+  const wavData = sentenceWavData[currentSentenceIdx];
+  if (!wavData) {return;}
 
   currentSentenceElapsed = 0;
   isManuallyNavigating = false;
 
-  postToPlayer({ type: "LOAD_WAV", wavBase64, speed: currentSpeed });
+  postToPlayer({ type: "LOAD_WAV", wavData, speed: currentSpeed });
 
   playerState = {
     ...playerState,
     isPlaying: true,
     currentIndex: currentSentenceIdx,
-    queueLength: sentenceWavBase64.filter(d => d !== null).length,
+    queueLength: sentenceWavData.filter(d => d !== null).length,
   };
   totalElapsedTime = computeElapsedTime();
   totalEstimatedDuration = computeTotalDuration();
@@ -1094,7 +1094,7 @@ function handleSeekToSentence(idx: number) {
   isFinished = false;
   currentSentenceIdx = idx;
 
-  if (sentenceWavBase64[idx]) {
+  if (sentenceWavData[idx]) {
     playCurrentSentence();
   } else {
     // WAV not generated yet — tell offscreen to skip ahead and generate this sentence next
@@ -1117,7 +1117,7 @@ function handleLocalSetSpeed(speed: number) {
 
 function cleanupAudioEngine() {
   postToPlayer({ type: "RESET" });
-  sentenceWavBase64 = [];
+  sentenceWavData = [];
   sentenceDurations = [];
   currentSentenceIdx = 0;
   currentSentenceElapsed = 0;
@@ -2271,7 +2271,7 @@ chrome.runtime.onMessage.addListener((message) => {
     // Store generation context for regeneration requests
     if (message.sentences) {
       generationSentences = message.sentences as string[];
-      sentenceWavBase64 = new Array(totalChunks).fill(null);
+      sentenceWavData = new Array(totalChunks).fill(null);
       sentenceDurations = new Array(totalChunks).fill(0);
       // Estimate total duration from text length (~14 chars/sec + 0.3s pause per sentence)
       const CHARS_PER_SEC = 14;
@@ -2285,14 +2285,14 @@ chrome.runtime.onMessage.addListener((message) => {
 
   if (message.type === "TTS_SENTENCE_WAV") {
     const idx = message.index as number;
-    const wavBase64 = message.wavBase64 as string;
+    const wavData = new Uint8Array(message.wavBytes as number[]).buffer;
     const duration = message.duration as number;
 
     // Ensure arrays are large enough
-    while (sentenceWavBase64.length <= idx) {sentenceWavBase64.push(null);}
+    while (sentenceWavData.length <= idx) {sentenceWavData.push(null);}
     while (sentenceDurations.length <= idx) {sentenceDurations.push(0);}
 
-    sentenceWavBase64[idx] = wavBase64;
+    sentenceWavData[idx] = wavData;
     sentenceDurations[idx] = duration;
 
     // Update total duration estimate
@@ -2301,7 +2301,7 @@ chrome.runtime.onMessage.addListener((message) => {
     // Update player state
     playerState = {
       ...playerState,
-      queueLength: sentenceWavBase64.filter(d => d !== null).length,
+      queueLength: sentenceWavData.filter(d => d !== null).length,
       duration: totalEstimatedDuration,
     };
 
@@ -2442,7 +2442,7 @@ document.addEventListener("click", (e) => {
   const idx = getSentenceIndexAtPoint(e.clientX, e.clientY);
   if (idx >= 0) {
     // Show loading highlight if seeking to an unloaded sentence
-    if (!sentenceWavBase64[idx] && highlightingEnabled && highlightOverlay) {
+    if (!sentenceWavData[idx] && highlightingEnabled && highlightOverlay) {
       const rects = sentenceRectsCache[idx];
       if (rects && rects.length > 0) {
         currentHighlightBoxes.forEach(box => box.remove());
