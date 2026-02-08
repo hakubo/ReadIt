@@ -1,12 +1,11 @@
 import { getModel } from "@/lib/resources";
 import type { LangId } from "@/lib/resources";
 import { acceleration } from "./detectWebGPU";
-import { combineVoices } from "./combineVoices";
+import { loadVoice } from "./combineVoices";
 import { preprocessText, type TextProcessorChunk } from "./textProcessor";
 import { trimWaveform } from "./trimWaveform";
 import { getOnnxRuntime } from "./getOnnxRuntime";
 import { createWavBuffer } from "./createWavBuffer";
-import { parseVoiceFormula } from "./voiceFormula";
 
 const MODEL_CONTEXT_WINDOW = 512;
 const SAMPLE_RATE = 24000; // sample rate in Hz
@@ -15,9 +14,9 @@ let cachedSession: Awaited<
   ReturnType<typeof import("onnxruntime-web/webgpu").InferenceSession.create>
 > | null = null;
 
-// Cache combined voice data to avoid re-fetching/reshaping on every sentence
-let cachedVoiceFormula = "";
-let cachedCombinedVoice: number[][][] | null = null;
+// Cache voice data to avoid re-fetching/reshaping on every sentence
+let cachedVoiceId = "";
+let cachedVoice: number[][][] | null = null;
 
 export function isSessionCached(): boolean {
   return cachedSession !== null;
@@ -33,8 +32,8 @@ export async function releaseModel(): Promise<void> {
   // the one being released.
   const session = cachedSession;
   cachedSession = null;
-  cachedVoiceFormula = "";
-  cachedCombinedVoice = null;
+  cachedVoiceId = "";
+  cachedVoice = null;
 
   if (session) {
     try {
@@ -68,18 +67,16 @@ export async function preloadModel(
  * For text segments the phonemizer is called, then punctuation splitting and token generation are applied.
  * Silence chunks produce silent waveforms.
  *
- * The voice formula is parsed into an array of voice weights.
- *
  * @param params - Generation parameters.
  * @param params.text - The input text.
  * @param params.lang - The language ID (for phonemization).
- * @param params.voiceFormula - The voice formula.
+ * @param params.voiceId - The voice ID.
  * @returns WAV buffer.
  */
 export async function generateVoice(params: {
   text: string;
   lang: LangId | string;
-  voiceFormula: string;
+  voiceId: string;
 }): Promise<{ buffer: ArrayBuffer; waveform: Float32Array; mimeType: string }> {
   if (!cachedSession) {
     await preloadModel();
@@ -95,14 +92,13 @@ export async function generateVoice(params: {
     tokensPerChunk,
   );
 
-  let combinedVoice: number[][][];
-  if (cachedCombinedVoice && cachedVoiceFormula === params.voiceFormula) {
-    combinedVoice = cachedCombinedVoice;
+  let voice: number[][][];
+  if (cachedVoice && cachedVoiceId === params.voiceId) {
+    voice = cachedVoice;
   } else {
-    const voices = parseVoiceFormula(params.voiceFormula);
-    combinedVoice = await combineVoices(voices);
-    cachedVoiceFormula = params.voiceFormula;
-    cachedCombinedVoice = combinedVoice;
+    voice = await loadVoice(params.voiceId);
+    cachedVoiceId = params.voiceId;
+    cachedVoice = voice;
   }
 
   const waveforms: Float32Array[] = [];
@@ -129,7 +125,7 @@ export async function generateVoice(params: {
       console.log({ type: chunk.type, content: chunk.content });
 
       const tokens = chunk.tokens;
-      const ref_s = combinedVoice[tokens.length - 1][0];
+      const ref_s = voice[tokens.length - 1][0];
       const paddedTokens = [0, ...tokens, 0];
       const input_ids = new ort.Tensor("int64", paddedTokens, [
         1,

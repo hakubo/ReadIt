@@ -34,13 +34,13 @@ function wavToBase64(waveform: Float32Array, sampleRate: number): string {
   return btoa(binary);
 }
 
-async function generateAndSendWav(index: number, sentence: string, lang: string, voiceFormula: string) {
+async function generateAndSendWav(index: number, sentence: string, lang: string, voiceId: string) {
   const silence = createSilenceWaveform(PAUSE_AFTER_SENTENCE_MS);
 
   const result = await generateVoice({
     text: sentence,
     lang,
-    voiceFormula,
+    voiceId,
   });
 
   // Append silence gap after sentence
@@ -97,7 +97,7 @@ async function handleGenerateTTSStreaming(
     totalChunks: totalSentences,
     sentences,
     lang,
-    voiceFormula: selectedVoiceId,
+    voiceId: selectedVoiceId,
   });
 
   const generated = new Set<number>(); // Track which sentences have been generated
@@ -264,7 +264,7 @@ async function handlePreviewVoice(voiceId: string) {
     const result = await generateVoice({
       text: "unmute page is really helpful",
       lang: voice?.lang?.id || "en-us",
-      voiceFormula: voiceId,
+      voiceId,
     });
     const wavBuffer = createWavBuffer(result.waveform as Float32Array<ArrayBuffer>, SAMPLE_RATE);
     const blob = new Blob([wavBuffer], { type: "audio/wav" });
