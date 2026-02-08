@@ -1472,11 +1472,25 @@ function detectMainContent(): string | null {
   return null;
 }
 
-// Score an element by its clean text length (for comparison only)
+// Score an element by its clean text length (for comparison only).
+// Uses a TreeWalker to skip noise subtrees without cloning the DOM.
 function scoreContentLength(el: Element): number {
-  const clone = el.cloneNode(true) as Element;
-  clone.querySelectorAll(NOISE_SELECTOR).forEach((n) => n.remove());
-  return (clone.textContent || "").length;
+  let length = 0;
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_ALL, {
+    acceptNode(node: Node) {
+      if (node.nodeType === Node.ELEMENT_NODE && (node as Element).matches(NOISE_SELECTOR)) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      if (node.nodeType === Node.TEXT_NODE) {
+        return NodeFilter.FILTER_ACCEPT;
+      }
+      return NodeFilter.FILTER_SKIP;
+    },
+  });
+  while (walker.nextNode()) {
+    length += (walker.currentNode as Text).data.length;
+  }
+  return length;
 }
 
 // Check if an element has a noise ancestor within a given boundary.
