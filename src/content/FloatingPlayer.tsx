@@ -1,13 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Play, Pause, X, RotateCcw, Settings } from "lucide-react";
 import { SettingsPanel } from "./SettingsPanel";
-
-export type LoadingStatus =
-  | "starting"
-  | "phonemizing"
-  | "loading_model"
-  | "generating"
-  | "done";
+import { usePlaybackStore } from "./playerStore";
 
 export interface PlayerState {
   isPlaying: boolean;
@@ -17,34 +11,22 @@ export interface PlayerState {
   queueLength: number;
 }
 
+// Stable callback props — these should be module-level functions in index.tsx
+// so React sees the same reference every render.
 interface FloatingPlayerProps {
-  loading: boolean;
-  loadingStatus: LoadingStatus;
-  totalChunks: number;
-  isStreaming: boolean;
-  playerState: PlayerState;
-  speed: number;
-  totalElapsedTime: number;
-  totalEstimatedDuration: number;
-  finished: boolean;
-  downloadProgress: { downloaded: number; total: number } | null;
   onPlay: () => void;
   onPause: () => void;
   onRestart: () => void;
   onSetSpeed: (speed: number) => void;
   onClose: () => void;
-  forceSettingsOpen?: boolean;
-  onSettingsOpened?: () => void;
-  domain: string;
-  theme: "light" | "dark";
+  onSettingsOpened: () => void;
   initialPosition?: { x: number; y: number };
-  onPositionChange?: (pos: { x: number; y: number }) => void;
-  onPickContent?: () => void;
-  contentSelector?: string;
-  onClearContentSelector?: () => void;
-  onSetContentSelector?: (selector: string) => void;
-  onSelectorFocus?: () => void;
-  onSelectorBlur?: () => void;
+  onPositionChange: (pos: { x: number; y: number }) => void;
+  onPickContent: () => void;
+  onClearContentSelector: () => void;
+  onSetContentSelector: (selector: string) => void;
+  onSelectorFocus: () => void;
+  onSelectorBlur: () => void;
 }
 
 const SPEED_OPTIONS = [0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2];
@@ -62,32 +44,39 @@ function clampToViewport(pos: { x: number; y: number }, el: HTMLElement | null) 
   };
 }
 
+// Memoized SettingsPanel wrapper — only re-renders when its own props change
+const MemoizedSettingsPanel = memo(SettingsPanel);
+
 export function FloatingPlayer({
-  loading,
-  playerState,
-  speed,
-  totalElapsedTime,
-  totalEstimatedDuration,
-  finished,
-  downloadProgress,
   onPlay,
   onPause,
   onRestart,
   onSetSpeed,
   onClose,
-  forceSettingsOpen,
   onSettingsOpened,
-  domain,
-  theme,
   initialPosition,
   onPositionChange,
   onPickContent,
-  contentSelector,
   onClearContentSelector,
   onSetContentSelector,
   onSelectorFocus,
   onSelectorBlur,
 }: FloatingPlayerProps) {
+  // Subscribe to the external playback store — re-renders only when snapshot changes
+  const {
+    loading,
+    playerState,
+    speed,
+    totalElapsedTime,
+    totalEstimatedDuration,
+    finished,
+    downloadProgress,
+    forceSettingsOpen,
+    domain,
+    theme,
+    contentSelector,
+  } = usePlaybackStore();
+
   const [position, setPosition] = useState(() => {
     const initial = initialPosition || { x: window.innerWidth - 320, y: 8 };
     return clampToViewport(initial, null);
@@ -99,7 +88,7 @@ export function FloatingPlayer({
   useEffect(() => {
     if (forceSettingsOpen && !settingsOpen) {
       setSettingsOpen(true);
-      onSettingsOpened?.();
+      onSettingsOpened();
     }
   }, [forceSettingsOpen]);
 
@@ -140,7 +129,7 @@ export function FloatingPlayer({
   const wasDragging = useRef(false);
   useEffect(() => {
     if (wasDragging.current && !isDragging) {
-      onPositionChange?.(position);
+      onPositionChange(position);
     }
     wasDragging.current = isDragging;
   }, [isDragging]);
@@ -202,6 +191,10 @@ export function FloatingPlayer({
   const settingsPanelPos = pillRect
     ? { x: pillRect.right - 260, y: pillRect.bottom + 8 }
     : { x: position.x, y: position.y + 48 };
+
+  const handleSettingsClose = () => setSettingsOpen(false);
+  const handleSettingsToggle = () => setSettingsOpen(!settingsOpen);
+  const handlePickContent = () => { setSettingsOpen(false); onPickContent(); };
 
   return (
     <>
@@ -282,7 +275,7 @@ export function FloatingPlayer({
         {/* Settings cog */}
         <button
           className={`pill-icon-btn pill-cog${settingsOpen ? " active" : ""}`}
-          onClick={() => setSettingsOpen(!settingsOpen)}
+          onClick={handleSettingsToggle}
         >
           <Settings size={14} />
         </button>
@@ -308,13 +301,13 @@ export function FloatingPlayer({
         )}
       </div>
 
-      <SettingsPanel
+      <MemoizedSettingsPanel
         position={settingsPanelPos}
-        onClose={() => setSettingsOpen(false)}
+        onClose={handleSettingsClose}
         domain={domain}
         theme={theme}
         visible={settingsOpen}
-        onPickContent={() => { setSettingsOpen(false); onPickContent?.(); }}
+        onPickContent={handlePickContent}
         contentSelector={contentSelector}
         onClearContentSelector={onClearContentSelector}
         onSetContentSelector={onSetContentSelector}

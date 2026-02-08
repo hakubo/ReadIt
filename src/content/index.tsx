@@ -1,8 +1,9 @@
 import { createRoot, Root } from "react-dom/client";
 import { SelectionButton } from "./SelectionButton";
-import { FloatingPlayer, type LoadingStatus, type PlayerState } from "./FloatingPlayer";
+import { FloatingPlayer, type PlayerState } from "./FloatingPlayer";
 import { type TTSSettings, type SitePrefs, type TextReplacementRule } from "@/shared/types";
 import { getEffectiveSettings, getDomainSettings, saveGlobalSettings, saveDomainSettings } from "@/shared/settings";
+import { setPlaybackState } from "./playerStore";
 
 // Inject styles into shadow DOM
 const SHADOW_STYLES = `
@@ -864,9 +865,9 @@ let selectionButtonRoot: Root | null = null;
 let selectionButtonContainer: HTMLDivElement | null = null;
 let playerRoot: Root | null = null;
 let playerContainer: HTMLDivElement | null = null;
+let playerMounted = false;
 let selectedText = "";
 let isLoading = false;
-let loadingStatus: LoadingStatus = "starting";
 
 // Streaming state
 let totalChunks = 0;
@@ -937,6 +938,94 @@ let selectorInputFocused = false;
 // Theme state
 let currentTheme: "light" | "dark" = "dark";
 
+// Push current module-level state into the external playback store.
+// This replaces the old showPlayer()/updatePlayer() re-render path for data changes.
+function syncPlaybackStore() {
+  setPlaybackState({
+    loading: isLoading,
+    playerState,
+    speed: currentSpeed,
+    totalElapsedTime,
+    totalEstimatedDuration,
+    finished: isFinished,
+    downloadProgress,
+    forceSettingsOpen: openSettingsRequested,
+    domain: currentDomain,
+    theme: currentTheme,
+    contentSelector: sitePrefs.contentSelector,
+  });
+}
+
+// Throttle for PLAYER_TIME updates (fires ~60fps from rAF, 10fps is plenty for UI)
+let timeUpdateScheduled = false;
+
+function scheduleTimeUpdate() {
+  if (timeUpdateScheduled) {return;}
+  timeUpdateScheduled = true;
+  setTimeout(() => {
+    timeUpdateScheduled = false;
+    syncPlaybackStore();
+    updateSeekCursor();
+  }, 100);
+}
+
+// Stable module-level callbacks for <FloatingPlayer> — never re-created, so React
+// sees the same function reference on every render and skips reconciliation.
+function handlePlayCallback() {
+  const idle = !isLoading && playerState.queueLength === 0 && !isFinished;
+  if (idle) {
+    const sel = window.getSelection()?.toString().trim();
+    if (sel) {
+      selectedText = sel;
+      handleRead();
+      return;
+    }
+    const main = detectMainContent();
+    if (main) {
+      selectedText = main;
+      handleRead();
+      return;
+    }
+  }
+  handleLocalPlay();
+}
+
+function handlePauseCallback() {
+  handleLocalPause();
+}
+
+function handleSettingsOpenedCallback() {
+  openSettingsRequested = false;
+}
+
+function handlePositionChangeCallback(pos: { x: number; y: number }) {
+  saveSitePrefs({ playerPosition: pos });
+}
+
+function handleClearContentSelectorCallback() {
+  saveSitePrefs({ contentSelector: undefined });
+  hideSelectorPreview();
+  estimatePageDuration();
+  syncPlaybackStore();
+}
+
+function handleSetContentSelectorCallback(sel: string) {
+  saveSitePrefs({ contentSelector: sel || undefined });
+  if (selectorInputFocused) {showSelectorPreview();}
+  estimatePageDuration();
+  syncPlaybackStore();
+}
+
+function handleSelectorFocusCallback() {
+  selectorInputFocused = true;
+  showSelectorPreview();
+}
+
+function handleSelectorBlurCallback() {
+  selectorInputFocused = false;
+  hideSelectorPreview();
+}
+
 // --- Local audio playback engine (extension iframe — bypasses page CSP) ---
 
 function ensurePlayerIframe(): HTMLIFrameElement {
@@ -976,7 +1065,8 @@ function ensurePlayerIframe(): HTMLIFrameElement {
         currentTime: totalElapsedTime,
         currentIndex: currentSentenceIdx,
       };
-      updatePlayer();
+      // Throttle time updates to ~10fps (100ms) — plenty for progress ring / time display
+      scheduleTimeUpdate();
     }
     if (msg.type === "PLAYER_ENDED") {
       handleAudioEnded();
@@ -2061,61 +2151,36 @@ function showPlayer() {
     playerRoot = createRoot(renderTarget);
   }
 
-  playerRoot?.render(
-    <FloatingPlayer
-      loading={isLoading}
-      loadingStatus={loadingStatus}
-      totalChunks={totalChunks}
-      isStreaming={isStreaming}
-      playerState={playerState}
-      speed={currentSpeed}
-      totalElapsedTime={totalElapsedTime}
-      totalEstimatedDuration={totalEstimatedDuration}
-      finished={isFinished}
-      downloadProgress={downloadProgress}
-      onPlay={() => {
-        const idle = !isLoading && playerState.queueLength === 0 && !isFinished;
-        if (idle) {
-          // Try current text selection first
-          const sel = window.getSelection()?.toString().trim();
-          if (sel) {
-            selectedText = sel;
-            handleRead();
-            return;
-          }
-          // Fall back to main page content
-          const main = detectMainContent();
-          if (main) {
-            selectedText = main;
-            handleRead();
-            return;
-          }
-        }
-        handleLocalPlay();
-      }}
-      onPause={() => handleLocalPause()}
-      onRestart={handleRestart}
-      onSetSpeed={(speed) => handleLocalSetSpeed(speed)}
-      onClose={stopPlayback}
-      forceSettingsOpen={openSettingsRequested}
-      onSettingsOpened={() => { openSettingsRequested = false; }}
-      domain={currentDomain}
-      theme={currentTheme}
-      initialPosition={sitePrefs.playerPosition}
-      onPositionChange={(pos) => saveSitePrefs({ playerPosition: pos })}
-      onPickContent={startElementPicker}
-      contentSelector={sitePrefs.contentSelector}
-      onClearContentSelector={() => { saveSitePrefs({ contentSelector: undefined }); hideSelectorPreview(); estimatePageDuration(); updatePlayer(); }}
-      onSetContentSelector={(sel) => { saveSitePrefs({ contentSelector: sel || undefined }); if (selectorInputFocused) {showSelectorPreview();} estimatePageDuration(); updatePlayer(); }}
-      onSelectorFocus={() => { selectorInputFocused = true; showSelectorPreview(); }}
-      onSelectorBlur={() => { selectorInputFocused = false; hideSelectorPreview(); }}
-    />
-  );
+  // Sync state into the external store so React picks up current values
+  syncPlaybackStore();
+
+  // Only mount the component tree once — subsequent updates flow through
+  // the playback store (useSyncExternalStore) without re-mounting.
+  if (!playerMounted) {
+    playerMounted = true;
+    playerRoot?.render(
+      <FloatingPlayer
+        onPlay={handlePlayCallback}
+        onPause={handlePauseCallback}
+        onRestart={handleRestart}
+        onSetSpeed={handleLocalSetSpeed}
+        onClose={stopPlayback}
+        onSettingsOpened={handleSettingsOpenedCallback}
+        initialPosition={sitePrefs.playerPosition}
+        onPositionChange={handlePositionChangeCallback}
+        onPickContent={startElementPicker}
+        onClearContentSelector={handleClearContentSelectorCallback}
+        onSetContentSelector={handleSetContentSelectorCallback}
+        onSelectorFocus={handleSelectorFocusCallback}
+        onSelectorBlur={handleSelectorBlurCallback}
+      />
+    );
+  }
 }
 
 function updatePlayer() {
   if (playerRoot) {
-    showPlayer();
+    syncPlaybackStore();
   }
   updateSeekCursor();
 }
@@ -2152,6 +2217,7 @@ function destroyPlayer() {
     playerContainer.remove();
     playerRoot = null;
     playerContainer = null;
+    playerMounted = false;
   }
 }
 
@@ -2192,7 +2258,6 @@ async function handleRead() {
   isFinished = false;
   isLoading = true;
   isStreaming = true;
-  loadingStatus = "starting";
   totalChunks = 0;
   totalElapsedTime = 0;
   // Estimate from selected text so we never show --:--
@@ -2304,7 +2369,6 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (message.type === "TTS_PROGRESS") {
-    loadingStatus = message.status as LoadingStatus;
     if (message.totalChunks) {totalChunks = message.totalChunks;}
     updatePlayer();
   }
@@ -2369,7 +2433,6 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message.type === "TTS_STREAM_END") {
     isStreaming = false;
     isLoading = false;
-    loadingStatus = "done";
     updatePlayer();
   }
 
