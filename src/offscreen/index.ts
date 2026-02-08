@@ -1,6 +1,6 @@
 import { generateVoice, isSessionCached, preloadModel, releaseModel } from "@/lib/kokoro";
 import { createWavBuffer } from "@/lib/kokoro/createWavBuffer";
-import { voicesMap } from "@/lib/resources";
+import { voicesMap, isVoiceCached } from "@/lib/resources";
 import { DEFAULT_SETTINGS, type TTSSettings } from "@/shared/types";
 
 const SAMPLE_RATE = 24000;
@@ -94,6 +94,7 @@ async function handleGenerateTTSStreaming(
 
   const generated = new Set<number>(); // Track which sentences have been generated
   let voiceDownloadNotified = false;
+  const voiceCached = await isVoiceCached(selectedVoiceId);
 
   for (let i = 0; i < sentences.length; i++) {
     if (abortGeneration) {
@@ -143,7 +144,7 @@ async function handleGenerateTTSStreaming(
     });
 
     try {
-      if (!voiceDownloadNotified) {
+      if (!voiceDownloadNotified && !voiceCached) {
         voiceDownloadNotified = true;
         chrome.runtime.sendMessage({ type: "VOICE_DOWNLOAD_START", voiceId: selectedVoiceId });
       }
@@ -151,8 +152,8 @@ async function handleGenerateTTSStreaming(
       generated.add(i);
 
       // Notify voice download complete after first successful generation
-      // (voice file is now cached in memory)
-      if (generated.size === 1) {
+      // (voice file is now cached)
+      if (generated.size === 1 && voiceDownloadNotified) {
         chrome.runtime.sendMessage({ type: "VOICE_DOWNLOAD_COMPLETE", voiceId: selectedVoiceId });
       }
 

@@ -24,9 +24,7 @@ export async function getModel(
  *
  * @param id The id of the voice file
  */
-export async function getVoiceFile(
-  id: VoiceId | string
-): Promise<ArrayBuffer> {
+function resolveVoiceUrl(id: VoiceId | string): string {
   let voiceId = voicesMap["af_alloy"].id;
   for (const key of Object.keys(voicesMap)) {
     if (key === id) {
@@ -34,9 +32,23 @@ export async function getVoiceFile(
       break;
     }
   }
+  return `${downloadUrl}/voices/${voiceId}.bin`;
+}
 
-  const url = `${downloadUrl}/voices/${voiceId}.bin`;
+export async function getVoiceFile(
+  id: VoiceId | string
+): Promise<ArrayBuffer> {
+  const url = resolveVoiceUrl(id);
   return await getFileFromUrl(url);
+}
+
+export async function isVoiceCached(id: VoiceId | string): Promise<boolean> {
+  try {
+    const cache = await caches.open("kokoro-tts-resources");
+    return !!(await cache.match(resolveVoiceUrl(id)));
+  } catch {
+    return false;
+  }
 }
 
 /**
