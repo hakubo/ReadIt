@@ -68,6 +68,7 @@ This project would not be possible without the following open-source projects:
 - **[ONNX Runtime Web](https://onnxruntime.ai/)** by Microsoft — Enables running the Kokoro model directly in the browser via WebAssembly, making fully local, private TTS inference possible without any server.
 - **[Kokoro ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX)** by the ONNX Community (Xenova) — The ONNX-converted version of Kokoro, optimized for browser-based inference, which this extension loads and runs.
 - **[eSpeak NG](https://github.com/espeak-ng/espeak-ng)** — A compact speech synthesizer used here for phoneme/tokenization processing that feeds into the Kokoro model.
+- **[kokoro-web](https://github.com/eduardolat/kokoro-web)** by Eduardo Lát — A web-based Kokoro TTS interface that heavily inspired this extension.
 
 ## License
 
