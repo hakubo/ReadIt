@@ -20,12 +20,12 @@ export async function combineVoices(
     throw new Error("You must select at least one voice");
   }
 
-  // Total weight must be <= 1
+  // Total weight must equal 1 (with tolerance for floating-point imprecision)
   let totalWeight = 0;
   for (const { weight } of voices) {
     totalWeight += weight;
   }
-  if (totalWeight !== 1) {
+  if (Math.abs(totalWeight - 1) > 1e-6) {
     throw new Error(
       `The sum of all voice weights must be 100%, but it is ${totalWeight * 100}%`
     );

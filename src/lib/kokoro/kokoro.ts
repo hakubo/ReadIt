@@ -5,7 +5,6 @@ import { combineVoices } from "./combineVoices";
 import { preprocessText, type TextProcessorChunk } from "./textProcessor";
 import { trimWaveform } from "./trimWaveform";
 import { getOnnxRuntime } from "./getOnnxRuntime";
-import { createWavBuffer } from "./createWavBuffer";
 import { parseVoiceFormula } from "./voiceFormula";
 
 const MODEL_CONTEXT_WINDOW = 512;
@@ -16,6 +15,9 @@ const MODEL_ID = "model"; // fp32 — always use full precision
 let cachedSession: Awaited<
   ReturnType<typeof import("onnxruntime-web/webgpu").InferenceSession.create>
 > | null = null;
+
+// Deduplication lock for concurrent preloadModel calls
+let preloadPromise: Promise<void> | null = null;
 
 // Cache combined voice data to avoid re-fetching/reshaping on every sentence
 let cachedVoiceFormula = "";
@@ -49,18 +51,29 @@ export async function releaseModel(): Promise<void> {
 
 /**
  * Preloads the ONNX model so it's ready when the user first triggers TTS.
+ * Concurrent calls are deduplicated — only the first triggers a download.
  */
 export async function preloadModel(
   onProgress?: (downloaded: number, total: number) => void,
 ): Promise<void> {
-  if (cachedSession) {return;}
-  const ort = getOnnxRuntime();
-  const modelBuffer = await getModel(MODEL_ID, onProgress);
-  cachedSession = await ort.InferenceSession.create(modelBuffer, {
-    executionProviders: [acceleration],
-    preferredOutputLocation: "cpu-pinned",
-  });
-  console.log(`Model loaded (${acceleration})`);
+  if (cachedSession) { return; }
+  if (preloadPromise) { return preloadPromise; }
+
+  preloadPromise = (async () => {
+    const ort = getOnnxRuntime();
+    const modelBuffer = await getModel(MODEL_ID, onProgress);
+    cachedSession = await ort.InferenceSession.create(modelBuffer, {
+      executionProviders: [acceleration],
+      preferredOutputLocation: "cpu-pinned",
+    });
+    console.log(`Model loaded (${acceleration})`);
+  })();
+
+  try {
+    await preloadPromise;
+  } finally {
+    preloadPromise = null;
+  }
 }
 
 /**
@@ -82,7 +95,7 @@ export async function generateVoice(params: {
   text: string;
   lang: LangId | string;
   voiceFormula: string;
-}): Promise<{ buffer: ArrayBuffer; waveform: Float32Array; mimeType: string }> {
+}): Promise<{ waveform: Float32Array }> {
   if (!cachedSession) {
     await preloadModel();
   }
@@ -164,6 +177,5 @@ export async function generateVoice(params: {
     offset += waveform.length;
   }
 
-  const wavBuffer = createWavBuffer(finalWaveform, SAMPLE_RATE);
-  return { buffer: wavBuffer, waveform: finalWaveform, mimeType: "audio/wav" };
+  return { waveform: finalWaveform };
 }

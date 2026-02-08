@@ -1229,10 +1229,22 @@ function updateDebugOverlay() {
 
     const color = hasWav ? "#86efac" : "#6b7280";
     const icon = hasWav ? (isCurrent ? "\u25B6" : "\u2713") : "\u2022";
-    row.innerHTML =
-      `<span style="color:${color}">${icon} ${i}</span> ` +
-      `<span style="color:${isCurrent ? "white" : "#d1d5db"}">${truncated}</span>` +
-      `<span style="color:#6b7280">${timeInfo}</span>`;
+
+    const indexSpan = document.createElement("span");
+    indexSpan.style.color = color;
+    indexSpan.textContent = `${icon} ${i} `;
+
+    const textSpan = document.createElement("span");
+    textSpan.style.color = isCurrent ? "white" : "#d1d5db";
+    textSpan.textContent = truncated;
+
+    const timeSpan = document.createElement("span");
+    timeSpan.style.color = "#6b7280";
+    timeSpan.textContent = timeInfo;
+
+    row.appendChild(indexSpan);
+    row.appendChild(textSpan);
+    row.appendChild(timeSpan);
     debugOverlayEl.appendChild(row);
   }
 }
@@ -1556,11 +1568,25 @@ function detectMainContent(): string | null {
   return null;
 }
 
-// Score an element by its clean text length (for comparison only)
+// Score an element by its clean text length (for comparison only).
+// Uses TreeWalker to sum text node lengths, skipping noise subtrees.
 function scoreContentLength(el: Element): number {
-  const clone = el.cloneNode(true) as Element;
-  clone.querySelectorAll(NOISE_SELECTOR).forEach((n) => n.remove());
-  return (clone.textContent || "").length;
+  let length = 0;
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_ALL, {
+    acceptNode(node) {
+      if (node.nodeType === Node.ELEMENT_NODE && node !== el && (node as Element).matches(NOISE_SELECTOR)) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      if (node.nodeType === Node.TEXT_NODE) {
+        return NodeFilter.FILTER_ACCEPT;
+      }
+      return NodeFilter.FILTER_SKIP;
+    },
+  });
+  while (walker.nextNode()) {
+    length += (walker.currentNode.textContent || "").length;
+  }
+  return length;
 }
 
 // Check if an element has a noise ancestor within a given boundary.

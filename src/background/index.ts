@@ -300,6 +300,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Close offscreen after generation ends to free ONNX/WASM memory
   if (message.type === "TTS_STREAM_END") {
+    if (offscreenIdleTimer) { clearTimeout(offscreenIdleTimer); }
     offscreenIdleTimer = setTimeout(() => {
       offscreenIdleTimer = null;
       closeOffscreenDocument();

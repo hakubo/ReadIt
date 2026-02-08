@@ -27,11 +27,13 @@ function freeMemory() {
 function wavToBase64(waveform: Float32Array, sampleRate: number): string {
   const wavBuffer = createWavBuffer(waveform as Float32Array<ArrayBuffer>, sampleRate);
   const bytes = new Uint8Array(wavBuffer);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const CHUNK_SIZE = 8192;
+  const chunks: string[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    const slice = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length));
+    chunks.push(String.fromCharCode.apply(null, slice as unknown as number[]));
   }
-  return btoa(binary);
+  return btoa(chunks.join(""));
 }
 
 async function generateAndSendWav(index: number, sentence: string, lang: string, voiceFormula: string) {
@@ -248,9 +250,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 // --- Voice preview ---
 let previewAudio: HTMLAudioElement | null = null;
+let previewBlobUrl: string | null = null;
+
+function cleanupPreviewAudio() {
+  if (previewAudio) { previewAudio.pause(); previewAudio.src = ""; }
+  if (previewBlobUrl) { URL.revokeObjectURL(previewBlobUrl); previewBlobUrl = null; }
+  previewAudio = null;
+}
 
 async function handlePreviewVoice(voiceId: string) {
-  if (previewAudio) { previewAudio.pause(); previewAudio.src = ""; }
+  cleanupPreviewAudio();
 
   if (isGenerating) {
     chrome.runtime.sendMessage({ type: "PREVIEW_STATE", voiceId, playing: false });
@@ -268,17 +277,19 @@ async function handlePreviewVoice(voiceId: string) {
     });
     const wavBuffer = createWavBuffer(result.waveform as Float32Array<ArrayBuffer>, SAMPLE_RATE);
     const blob = new Blob([wavBuffer], { type: "audio/wav" });
-    const url = URL.createObjectURL(blob);
-    previewAudio = new Audio(url);
+    previewBlobUrl = URL.createObjectURL(blob);
+    previewAudio = new Audio(previewBlobUrl);
     previewAudio.addEventListener("ended", () => {
-      URL.revokeObjectURL(url);
+      cleanupPreviewAudio();
       chrome.runtime.sendMessage({ type: "PREVIEW_STATE", voiceId, playing: false });
     });
     await previewAudio.play();
   } catch {
+    cleanupPreviewAudio();
     chrome.runtime.sendMessage({ type: "PREVIEW_STATE", voiceId, playing: false });
+  } finally {
+    isGenerating = false;
   }
-  isGenerating = false;
 }
 
 console.log("unmute.page offscreen document loaded");

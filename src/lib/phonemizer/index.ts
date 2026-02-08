@@ -14,8 +14,11 @@ function getEspeakWasmUrl(): string {
 let cachedWasmBinary: ArrayBuffer | null = null;
 
 async function getWasmBinary(): Promise<ArrayBuffer> {
-  if (cachedWasmBinary) {return cachedWasmBinary;}
+  if (cachedWasmBinary) { return cachedWasmBinary; }
   const response = await fetch(getEspeakWasmUrl());
+  if (!response.ok) {
+    throw new Error(`Failed to fetch espeak WASM: ${response.status} ${response.statusText}`);
+  }
   cachedWasmBinary = await response.arrayBuffer();
   return cachedWasmBinary;
 }
