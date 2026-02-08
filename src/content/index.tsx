@@ -821,6 +821,33 @@ const SHADOW_STYLES = `
   }
 `;
 
+// Extension context invalidation guard
+// When the extension is reloaded/updated, the content script's connection to the
+// background is severed. All further chrome.runtime.sendMessage calls will throw.
+// This wrapper catches those errors and disables further messaging attempts.
+let extensionContextInvalidated = false;
+
+function safeSendMessage(message: Record<string, unknown>): Promise<unknown> {
+  if (extensionContextInvalidated) {
+    return Promise.resolve(undefined);
+  }
+  try {
+    return chrome.runtime.sendMessage(message).catch((err: unknown) => {
+      if (err instanceof Error && err.message.includes("Extension context invalidated")) {
+        extensionContextInvalidated = true;
+        return undefined;
+      }
+      throw err;
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.includes("Extension context invalidated")) {
+      extensionContextInvalidated = true;
+      return Promise.resolve(undefined);
+    }
+    throw err;
+  }
+}
+
 // Per-domain preferences (position, enabled, etc.)
 const currentDomain = window.location.hostname;
 const SITE_KEY = `site:${currentDomain}`;
@@ -1053,7 +1080,7 @@ function playCurrentSentence() {
   updatePlayer();
 
   // Advance windowed generation
-  chrome.runtime.sendMessage({
+  safeSendMessage({
     type: "ADVANCE_GENERATION",
     upTo: currentSentenceIdx + 15,
   });
@@ -1100,7 +1127,7 @@ function handleSeekToSentence(idx: number) {
     playCurrentSentence();
   } else {
     // WAV not generated yet — tell offscreen to skip ahead and generate this sentence next
-    chrome.runtime.sendMessage({
+    safeSendMessage({
       type: "REGENERATE_SENTENCE",
       index: idx,
     });
@@ -1579,7 +1606,7 @@ function extractUrls(text: string): string[] {
 
 async function fetchPageTitle(url: string): Promise<string | null> {
   try {
-    const response = await chrome.runtime.sendMessage({ type: 'FETCH_PAGE_TITLE', url });
+    const response = await safeSendMessage({ type: 'FETCH_PAGE_TITLE', url }) as { title?: string } | undefined;
     return response?.title || null;
   } catch { return null; }
 }
@@ -2097,7 +2124,7 @@ function updatePlayer() {
 function stopPlayback() {
   closedManually = true;
   isFinished = false;
-  chrome.runtime.sendMessage({ type: "PLAYER_RESET" });
+  safeSendMessage({ type: "PLAYER_RESET" });
   cleanupAudioEngine();
   cleanupHighlighting();
   totalChunks = 0;
@@ -2184,11 +2211,11 @@ async function handleRead() {
   showPlayer();
 
   try {
-    const response = await chrome.runtime.sendMessage({
+    const response = await safeSendMessage({
       type: "GENERATE_TTS",
       sentences: processedSentences,
       settings,
-    });
+    }) as { success?: boolean; error?: string } | undefined;
 
     if (!response || !response.success) {
       throw new Error(response?.error || "TTS generation failed");
