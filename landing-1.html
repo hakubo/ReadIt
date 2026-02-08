@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>unmute.page — Listen to any webpage with AI voice</title>
+  <meta name="description" content="A free, private Chrome extension that reads any webpage aloud with natural AI voices. No subscriptions, no servers, everything runs locally in your browser.">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --text: #1a1a2e;
+      --text-secondary: #555;
+      --text-muted: #888;
+      --bg: #fafaf9;
+      --surface: #fff;
+      --border: #e8e8e4;
+      --accent: #2d5a3d;
+      --accent-light: #e8f0eb;
+      --accent-dark: #1e3d29;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ---- Nav ---- */
+    nav {
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    nav .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .nav-brand svg {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.9rem;
+    }
+
+    .nav-links a {
+      color: var(--text-secondary);
+    }
+
+    /* ---- Hero ---- */
+    .hero {
+      padding: 100px 0 80px;
+      text-align: center;
+    }
+
+    .hero h1 {
+      font-size: 3rem;
+      font-weight: 400;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      margin-bottom: 24px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero h1 em {
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--text-secondary);
+      max-width: 460px;
+      margin: 0 auto 40px;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 14px 28px;
+      border-radius: 8px;
+      transition: background 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-dark);
+      text-decoration: none;
+    }
+
+    .btn-secondary {
+      display: inline-block;
+      color: var(--text-secondary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.95rem;
+      padding: 14px 20px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      transition: border-color 0.2s;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--text-muted);
+      text-decoration: none;
+    }
+
+    /* ---- Privacy banner ---- */
+    .privacy-banner {
+      background: var(--accent-light);
+      border: 1px solid #c5d9cc;
+      border-radius: 12px;
+      padding: 24px 32px;
+      text-align: center;
+      margin-bottom: 80px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .privacy-banner p {
+      font-size: 1rem;
+      color: var(--accent-dark);
+      line-height: 1.6;
+    }
+
+    .privacy-banner strong {
+      font-weight: 700;
+    }
+
+    /* ---- Divider ---- */
+    .divider {
+      width: 40px;
+      height: 1px;
+      background: var(--border);
+      margin: 0 auto;
+    }
+
+    /* ---- How it works ---- */
+    .how-it-works {
+      padding: 80px 0;
+    }
+
+    .how-it-works h2 {
+      font-size: 1.8rem;
+      font-weight: 400;
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    .steps-list {
+      list-style: none;
+      counter-reset: step;
+    }
+
+    .steps-list li {
+      counter-increment: step;
+      display: flex;
+      align-items: flex-start;
+      gap: 24px;
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .steps-list li:last-child {
+      border-bottom: none;
+    }
+
+    .steps-list li::before {
+      content: counter(step);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1.5px solid var(--accent);
+      color: var(--accent);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .step-content h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin-bottom: 4px;
+    }
+
+    .step-content p {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    /* ---- Features ---- */
+    .features {
+      padding: 80px 0;
+    }
+
+    .features h2 {
+      font-size: 1.8rem;
+      font-weight: 400;
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px 48px;
+    }
+
+    .feature h3 {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .feature p {
+      font-size: 1rem;
+      color: var(--text-secondary);
+    }
+
+    /* ---- About ---- */
+    .about {
+      padding: 80px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .about h2 {
+      font-size: 1.8rem;
+      font-weight: 400;
+      margin-bottom: 24px;
+    }
+
+    .about-content {
+      font-size: 1.05rem;
+      color: var(--text-secondary);
+    }
+
+    .about-content p {
+      margin-bottom: 16px;
+    }
+
+    .about-content p:last-child {
+      margin-bottom: 0;
+    }
+
+    .about-signature {
+      margin-top: 32px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .about-signature a {
+      color: var(--text-secondary);
+    }
+
+    /* ---- CTA ---- */
+    .cta-section {
+      padding: 80px 0;
+      text-align: center;
+    }
+
+    .cta-section h2 {
+      font-size: 2rem;
+      font-weight: 400;
+      margin-bottom: 16px;
+    }
+
+    .cta-section p {
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+    }
+
+    .cta-section .actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .coffee-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #40DCA5;
+      color: #000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 14px 24px;
+      border-radius: 8px;
+      transition: opacity 0.2s;
+    }
+
+    .coffee-btn:hover {
+      opacity: 0.85;
+      text-decoration: none;
+    }
+
+    /* ---- Footer ---- */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    footer .footer-links {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 12px;
+    }
+
+    footer a { color: var(--text-muted); }
+    footer a:hover { color: var(--text); }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 640px) {
+      .hero { padding: 64px 0 56px; }
+      .hero h1 { font-size: 2.2rem; }
+      .feature-grid { grid-template-columns: 1fr; gap: 32px; }
+      .how-it-works, .features, .about, .cta-section { padding: 56px 0; }
+      .privacy-banner { padding: 20px 24px; margin-bottom: 56px; }
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="container">
+      <a href="#" class="nav-brand">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+          <defs><clipPath id="r1"><rect width="512" height="512" rx="40" ry="40"/></clipPath></defs>
+          <g clip-path="url(#r1)">
+            <rect width="512" height="512" fill="#FFFFFF"/>
+            <path d="M 0 0 H 422 L 512 90 V 512 H 0 Z" fill="#F5F2EB"/>
+            <path d="M 422 0 L 512 90 H 452 Q 422 90 422 60 Z" fill="#EBE5D5"/>
+            <line x1="56" y1="112" x2="456" y2="112" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="192" x2="456" y2="192" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="272" x2="456" y2="272" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="352" x2="456" y2="352" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="432" x2="456" y2="432" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <rect x="44" y="248" width="9" height="24" rx="4.5" fill="#1A3D2E"/>
+            <rect x="74" y="220" width="9" height="80" rx="4.5" fill="#1F432F"/>
+            <rect x="104" y="186" width="9" height="148" rx="4.5" fill="#254932"/>
+            <rect x="134" y="168" width="9" height="184" rx="4.5" fill="#2D5134"/>
+            <rect x="164" y="238" width="9" height="44" rx="4.5" fill="#365534"/>
+            <rect x="194" y="200" width="9" height="120" rx="4.5" fill="#415932"/>
+            <rect x="224" y="178" width="9" height="164" rx="4.5" fill="#4E5A2F"/>
+            <rect x="254" y="163" width="9" height="194" rx="4.5" fill="#5C5A2B"/>
+            <rect x="284" y="135" width="9" height="250" rx="4.5" fill="#6B5726"/>
+            <rect x="314" y="143" width="9" height="234" rx="4.5" fill="#775224"/>
+            <rect x="344" y="193" width="9" height="134" rx="4.5" fill="#7D4C27"/>
+            <rect x="374" y="233" width="9" height="54" rx="4.5" fill="#79432A"/>
+            <rect x="404" y="173" width="9" height="174" rx="4.5" fill="#6C3A27"/>
+            <rect x="434" y="208" width="9" height="104" rx="4.5" fill="#5D3122"/>
+            <rect x="464" y="248" width="9" height="24" rx="4.5" fill="#50291D"/>
+          </g>
+        </svg>
+        unmute.page
+      </a>
+      <ul class="nav-links">
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="https://github.com/nicholasgasior/kokoro-web" target="_blank" rel="noopener">GitHub</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="container">
+      <h1>Turn any webpage into something you can <em>listen&nbsp;to</em></h1>
+      <p>A Chrome extension that reads web pages aloud with natural AI voices. Free, private, and entirely local.</p>
+      <div class="hero-actions">
+        <a href="#install" class="btn-primary">Add to Chrome</a>
+        <a href="https://github.com/nicholasgasior/kokoro-web" class="btn-secondary" target="_blank" rel="noopener">View source</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Privacy banner -->
+  <div class="container">
+    <div class="privacy-banner">
+      <p><strong>Your text never leaves your browser.</strong> Voice generation happens 100% on your device. No servers, no APIs, no data collection. Your reading habits are yours alone.</p>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <section class="how-it-works" id="how">
+    <div class="container">
+      <h2>How it works</h2>
+      <ol class="steps-list">
+        <li>
+          <div class="step-content">
+            <h3>Select text on any page</h3>
+            <p>Highlight a paragraph, an article, or an entire page. A small "Read" button appears next to your selection.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <h3>Click "Read" and listen</h3>
+            <p>A floating player appears. The AI voice starts reading immediately while generating the rest in the background.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <h3>Customize to your taste</h3>
+            <p>Choose from 54 natural voices, adjust speed from 0.6x to 2x, enable sentence highlighting, and save per-site preferences.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <div class="container"><div class="divider"></div></div>
+
+  <!-- Features -->
+  <section class="features" id="features">
+    <div class="container">
+      <h2>What makes it different</h2>
+      <div class="feature-grid">
+        <div class="feature">
+          <h3>Private by design</h3>
+          <p>The entire TTS model runs inside your browser using ONNX and WebAssembly. Nothing is ever sent to the internet. Not your text, not your usage data, nothing.</p>
+        </div>
+        <div class="feature">
+          <h3>No subscriptions</h3>
+          <p>Install it once, use it forever. No accounts, no trial periods, no premium tiers. Every feature is available to everyone.</p>
+        </div>
+        <div class="feature">
+          <h3>54 natural voices</h3>
+          <p>Powered by Kokoro TTS, a high-quality neural voice model. Voices are downloaded once and cached locally for instant access.</p>
+        </div>
+        <div class="feature">
+          <h3>Deeply configurable</h3>
+          <p>Per-site voice preferences, adjustable speed, sentence highlighting with color options, content area selectors, and text replacement rules.</p>
+        </div>
+        <div class="feature">
+          <h3>Works offline</h3>
+          <p>After the initial model download (~326 MB), everything works without an internet connection. Voices are cached locally.</p>
+        </div>
+        <div class="feature">
+          <h3>Open source</h3>
+          <p>The full source code is available on GitHub. Inspect it, modify it, contribute to it. You own your tools.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- About -->
+  <section class="about" id="about">
+    <div class="container">
+      <h2>Why I built this</h2>
+      <div class="about-content">
+        <p>I kept running into the same problem: every text-to-speech tool I tried either sounded terrible, required a monthly subscription, or sent my text to some server I didn't control. I didn't want to pay $10/month just to have articles read to me. I didn't want to wonder who was reading my data on the other end.</p>
+        <p>So I built what I wanted: something that just works. Select text, click a button, listen. No sign-up, no credit card, no cloud dependency. The AI model runs entirely in your browser, which means your text stays on your machine.</p>
+        <p>But I also wanted it to be configurable for people who care about the details. Different voices for different sites. Speed adjustments. Sentence highlighting so you can follow along. Per-domain settings so your preferences stick.</p>
+        <p>This extension is free and will stay free. If you find it useful, a coffee is always appreciated.</p>
+      </div>
+      <div class="about-signature">
+        &mdash; Jakub, creator of unmute.page &middot;
+        <a href="https://buymeacoffee.com/jakubolek" target="_blank" rel="noopener">Buy me a coffee</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section" id="install">
+    <div class="container">
+      <h2>Ready to listen?</h2>
+      <p>Free. Private. No account needed.</p>
+      <div class="actions">
+        <a href="#install" class="btn-primary">Add to Chrome</a>
+        <a href="https://buymeacoffee.com/jakubolek" class="coffee-btn" target="_blank" rel="noopener">&#9749; Buy me a coffee</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="https://github.com/nicholasgasior/kokoro-web" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://buymeacoffee.com/jakubolek" target="_blank" rel="noopener">Buy me a coffee</a>
+      </div>
+      <p>unmute.page &mdash; free, private text-to-speech for the web.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

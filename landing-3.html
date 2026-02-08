@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>unmute.page — Free, private text-to-speech for the web</title>
+  <meta name="description" content="A free, private Chrome extension that reads any webpage aloud with natural AI voices. No subscriptions, no servers, everything runs locally in your browser.">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #f8f5f0;
+      color: #2c2c2c;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: #b45309; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ---- Header ---- */
+    header {
+      background: #2c2417;
+      color: #f8f5f0;
+      padding: 16px 0;
+    }
+
+    header .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1rem;
+      color: #f8f5f0;
+    }
+
+    .header-brand svg {
+      width: 28px;
+      height: 28px;
+      border-radius: 5px;
+    }
+
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 0.85rem;
+    }
+
+    .header-nav a {
+      color: #c9b99a;
+      transition: color 0.2s;
+    }
+
+    .header-nav a:hover {
+      color: #f8f5f0;
+      text-decoration: none;
+    }
+
+    .header-install {
+      background: #d97706;
+      color: #fff !important;
+      padding: 7px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    .header-install:hover { opacity: 0.9; }
+
+    /* ---- Hero ---- */
+    .hero {
+      background: linear-gradient(180deg, #2c2417 0%, #3d3225 100%);
+      color: #f8f5f0;
+      padding: 80px 0 96px;
+      text-align: center;
+    }
+
+    .hero-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 28px;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .hero-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .hero h1 {
+      font-size: 2.8rem;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      margin-bottom: 20px;
+      max-width: 580px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero h1 span {
+      color: #fbbf24;
+    }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: #c9b99a;
+      max-width: 480px;
+      margin: 0 auto 36px;
+    }
+
+    .hero-cta {
+      display: inline-block;
+      background: #d97706;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1.05rem;
+      padding: 16px 36px;
+      border-radius: 10px;
+      transition: background 0.2s;
+    }
+
+    .hero-cta:hover {
+      background: #b45309;
+      text-decoration: none;
+    }
+
+    /* ---- Callout bar ---- */
+    .callout-bar {
+      background: #fff;
+      border-bottom: 1px solid #e8e0d4;
+      padding: 20px 0;
+    }
+
+    .callout-bar .container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      flex-wrap: wrap;
+    }
+
+    .callout-item {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #6b5c4c;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .callout-item .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #16a34a;
+    }
+
+    /* ---- Content sections ---- */
+    .section {
+      padding: 72px 0;
+    }
+
+    .section + .section {
+      border-top: 1px solid #e8e0d4;
+    }
+
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #b45309;
+      margin-bottom: 12px;
+    }
+
+    .section h2 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      margin-bottom: 20px;
+    }
+
+    .section-lead {
+      font-size: 1.05rem;
+      color: #666;
+      margin-bottom: 40px;
+      max-width: 560px;
+    }
+
+    /* ---- How it works ---- */
+    .how-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .how-card {
+      background: #fff;
+      border: 1px solid #e8e0d4;
+      border-radius: 12px;
+      padding: 28px 24px;
+    }
+
+    .how-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      background: #fef3c7;
+      color: #92400e;
+      font-weight: 800;
+      font-size: 0.9rem;
+      border-radius: 8px;
+      margin-bottom: 14px;
+    }
+
+    .how-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .how-card p {
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    /* ---- Privacy section ---- */
+    .privacy-box {
+      background: #1a3d2e;
+      color: #d4edda;
+      border-radius: 16px;
+      padding: 48px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: center;
+    }
+
+    .privacy-box h2 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+
+    .privacy-box p {
+      font-size: 1rem;
+      line-height: 1.7;
+      color: #a7d4b5;
+    }
+
+    .privacy-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .privacy-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 0.95rem;
+      color: #d4edda;
+    }
+
+    .privacy-list .check {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #4ade80;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    /* ---- Features list ---- */
+    .features-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+    }
+
+    .feat-item h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .feat-item h3 .feat-icon {
+      font-size: 1.15rem;
+    }
+
+    .feat-item p {
+      font-size: 0.9rem;
+      color: #666;
+      line-height: 1.6;
+    }
+
+    /* ---- About / Story ---- */
+    .story-section {
+      background: #fff;
+      border: 1px solid #e8e0d4;
+      border-radius: 16px;
+      padding: 48px;
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 40px;
+      align-items: start;
+    }
+
+    .story-aside {
+      text-align: center;
+    }
+
+    .story-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #d97706, #b45309);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 2rem;
+      font-weight: 800;
+      margin: 0 auto 12px;
+    }
+
+    .story-name {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+
+    .story-role {
+      font-size: 0.8rem;
+      color: #999;
+    }
+
+    .story-links {
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .story-links a {
+      font-size: 0.85rem;
+    }
+
+    .story-body p {
+      font-size: 1rem;
+      color: #555;
+      margin-bottom: 14px;
+      line-height: 1.75;
+    }
+
+    .story-body p:last-child {
+      margin-bottom: 0;
+    }
+
+    .story-body p:first-child {
+      font-size: 1.05rem;
+      color: #333;
+    }
+
+    /* ---- Bottom CTA ---- */
+    .bottom-cta {
+      background: #2c2417;
+      color: #f8f5f0;
+      padding: 72px 0;
+      text-align: center;
+    }
+
+    .bottom-cta h2 {
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+
+    .bottom-cta p {
+      color: #c9b99a;
+      font-size: 1rem;
+      margin-bottom: 32px;
+    }
+
+    .bottom-buttons {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn-amber {
+      display: inline-block;
+      background: #d97706;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 14px 28px;
+      border-radius: 10px;
+      transition: background 0.2s;
+    }
+
+    .btn-amber:hover {
+      background: #b45309;
+      text-decoration: none;
+    }
+
+    .btn-coffee-warm {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #40DCA5;
+      color: #000;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 14px 24px;
+      border-radius: 10px;
+      transition: opacity 0.2s;
+    }
+
+    .btn-coffee-warm:hover {
+      opacity: 0.85;
+      text-decoration: none;
+    }
+
+    /* ---- Footer ---- */
+    footer {
+      background: #231d13;
+      color: #7a6e5e;
+      padding: 24px 0;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+
+    footer a { color: #a08d73; }
+    footer a:hover { color: #f8f5f0; }
+
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 768px) {
+      .hero { padding: 56px 0 72px; }
+      .hero h1 { font-size: 2rem; }
+      .how-grid { grid-template-columns: 1fr; }
+      .features-list { grid-template-columns: 1fr; }
+      .privacy-box { grid-template-columns: 1fr; padding: 32px 24px; }
+      .story-section { grid-template-columns: 1fr; padding: 32px 24px; }
+      .story-aside { display: flex; align-items: center; gap: 16px; text-align: left; }
+      .story-avatar { margin: 0; width: 56px; height: 56px; font-size: 1.5rem; }
+      .story-links { flex-direction: row; }
+      .section { padding: 48px 0; }
+      .bottom-cta { padding: 48px 0; }
+      .callout-bar .container { gap: 20px; }
+      .header-nav a:not(.header-install) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="container">
+      <a href="#" class="header-brand">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+          <defs><clipPath id="r3"><rect width="512" height="512" rx="40" ry="40"/></clipPath></defs>
+          <g clip-path="url(#r3)">
+            <rect width="512" height="512" fill="#FFFFFF"/>
+            <path d="M 0 0 H 422 L 512 90 V 512 H 0 Z" fill="#F5F2EB"/>
+            <path d="M 422 0 L 512 90 H 452 Q 422 90 422 60 Z" fill="#EBE5D5"/>
+            <line x1="56" y1="112" x2="456" y2="112" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="192" x2="456" y2="192" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="272" x2="456" y2="272" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="352" x2="456" y2="352" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="432" x2="456" y2="432" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <rect x="44" y="248" width="9" height="24" rx="4.5" fill="#1A3D2E"/>
+            <rect x="74" y="220" width="9" height="80" rx="4.5" fill="#1F432F"/>
+            <rect x="104" y="186" width="9" height="148" rx="4.5" fill="#254932"/>
+            <rect x="134" y="168" width="9" height="184" rx="4.5" fill="#2D5134"/>
+            <rect x="164" y="238" width="9" height="44" rx="4.5" fill="#365534"/>
+            <rect x="194" y="200" width="9" height="120" rx="4.5" fill="#415932"/>
+            <rect x="224" y="178" width="9" height="164" rx="4.5" fill="#4E5A2F"/>
+            <rect x="254" y="163" width="9" height="194" rx="4.5" fill="#5C5A2B"/>
+            <rect x="284" y="135" width="9" height="250" rx="4.5" fill="#6B5726"/>
+            <rect x="314" y="143" width="9" height="234" rx="4.5" fill="#775224"/>
+            <rect x="344" y="193" width="9" height="134" rx="4.5" fill="#7D4C27"/>
+            <rect x="374" y="233" width="9" height="54" rx="4.5" fill="#79432A"/>
+            <rect x="404" y="173" width="9" height="174" rx="4.5" fill="#6C3A27"/>
+            <rect x="434" y="208" width="9" height="104" rx="4.5" fill="#5D3122"/>
+            <rect x="464" y="248" width="9" height="24" rx="4.5" fill="#50291D"/>
+          </g>
+        </svg>
+        unmute.page
+      </a>
+      <div class="header-nav">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#about">About</a>
+        <a href="#install" class="header-install">Install</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+          <defs><clipPath id="r4"><rect width="512" height="512" rx="40" ry="40"/></clipPath></defs>
+          <g clip-path="url(#r4)">
+            <rect width="512" height="512" fill="#FFFFFF"/>
+            <path d="M 0 0 H 422 L 512 90 V 512 H 0 Z" fill="#F5F2EB"/>
+            <path d="M 422 0 L 512 90 H 452 Q 422 90 422 60 Z" fill="#EBE5D5"/>
+            <line x1="56" y1="112" x2="456" y2="112" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="192" x2="456" y2="192" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="272" x2="456" y2="272" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="352" x2="456" y2="352" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="432" x2="456" y2="432" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <rect x="44" y="248" width="9" height="24" rx="4.5" fill="#1A3D2E"/>
+            <rect x="74" y="220" width="9" height="80" rx="4.5" fill="#1F432F"/>
+            <rect x="104" y="186" width="9" height="148" rx="4.5" fill="#254932"/>
+            <rect x="134" y="168" width="9" height="184" rx="4.5" fill="#2D5134"/>
+            <rect x="164" y="238" width="9" height="44" rx="4.5" fill="#365534"/>
+            <rect x="194" y="200" width="9" height="120" rx="4.5" fill="#415932"/>
+            <rect x="224" y="178" width="9" height="164" rx="4.5" fill="#4E5A2F"/>
+            <rect x="254" y="163" width="9" height="194" rx="4.5" fill="#5C5A2B"/>
+            <rect x="284" y="135" width="9" height="250" rx="4.5" fill="#6B5726"/>
+            <rect x="314" y="143" width="9" height="234" rx="4.5" fill="#775224"/>
+            <rect x="344" y="193" width="9" height="134" rx="4.5" fill="#7D4C27"/>
+            <rect x="374" y="233" width="9" height="54" rx="4.5" fill="#79432A"/>
+            <rect x="404" y="173" width="9" height="174" rx="4.5" fill="#6C3A27"/>
+            <rect x="434" y="208" width="9" height="104" rx="4.5" fill="#5D3122"/>
+            <rect x="464" y="248" width="9" height="24" rx="4.5" fill="#50291D"/>
+          </g>
+        </svg>
+      </div>
+      <h1>Listen to the web.<br><span>No subscriptions.</span></h1>
+      <p>Select any text, click Read, and hear it spoken with natural AI voices. Entirely free, entirely local, entirely private.</p>
+      <a href="#install" class="hero-cta">Add to Chrome &mdash; It's free</a>
+    </div>
+  </section>
+
+  <!-- Callout bar -->
+  <div class="callout-bar">
+    <div class="container">
+      <div class="callout-item"><span class="dot"></span> Runs locally in your browser</div>
+      <div class="callout-item"><span class="dot"></span> No data leaves your device</div>
+      <div class="callout-item"><span class="dot"></span> No account needed</div>
+      <div class="callout-item"><span class="dot"></span> Free forever</div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="section" id="how">
+    <div class="container">
+      <div class="section-label">How it works</div>
+      <h2>Select. Click. Listen.</h2>
+      <p class="section-lead">No setup wizards, no configuration required. It works the moment you install it.</p>
+      <div class="how-grid">
+        <div class="how-card">
+          <div class="how-number">1</div>
+          <h3>Select text</h3>
+          <p>Highlight any text on any webpage. A "Read" button pops up right next to your selection.</p>
+        </div>
+        <div class="how-card">
+          <div class="how-number">2</div>
+          <h3>Click Read</h3>
+          <p>A floating player appears and starts reading. Audio streams while the rest generates ahead in the background.</p>
+        </div>
+        <div class="how-card">
+          <div class="how-number">3</div>
+          <h3>Make it yours</h3>
+          <p>Pick from 54 voices, set your speed, enable highlighting, save per-site preferences. As simple or as custom as you want.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Privacy -->
+  <div class="section">
+    <div class="container">
+      <div class="privacy-box">
+        <div>
+          <h2>Private by default, not by promise</h2>
+          <p>The Kokoro TTS model runs entirely inside your browser using ONNX and WebAssembly. There are no API calls to make, no servers to send text to. Your words never leave your machine.</p>
+        </div>
+        <ul class="privacy-list">
+          <li><span class="check">&#10003;</span> Voice generation happens 100% on-device</li>
+          <li><span class="check">&#10003;</span> Zero network requests for TTS</li>
+          <li><span class="check">&#10003;</span> No analytics, telemetry, or tracking</li>
+          <li><span class="check">&#10003;</span> Works completely offline after setup</li>
+          <li><span class="check">&#10003;</span> Open source &mdash; verify it yourself</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <div class="section" id="features">
+    <div class="container">
+      <div class="section-label">Features</div>
+      <h2>Simple by default, powerful when you need it</h2>
+      <p class="section-lead">It works out of the box. But if you like to tinker, there's depth here.</p>
+      <div class="features-list">
+        <div class="feat-item">
+          <h3><span class="feat-icon">&#127908;</span> 54 natural AI voices</h3>
+          <p>Powered by Kokoro TTS, an 82M-parameter neural voice model. Multiple languages, natural intonation, zero robotic monotone.</p>
+        </div>
+        <div class="feat-item">
+          <h3><span class="feat-icon">&#9889;</span> Adjustable speed</h3>
+          <p>Slide from 0.6x to 2x. Speed is applied during playback so generation stays fast regardless of your preference.</p>
+        </div>
+        <div class="feat-item">
+          <h3><span class="feat-icon">&#128396;</span> Sentence highlighting</h3>
+          <p>Follow along as the text is read. Choose from six highlight colors. Highlights scroll with the page automatically.</p>
+        </div>
+        <div class="feat-item">
+          <h3><span class="feat-icon">&#127760;</span> Per-site settings</h3>
+          <p>Different voice for news vs. documentation? Different speed for long articles? Preferences are saved per domain.</p>
+        </div>
+        <div class="feat-item">
+          <h3><span class="feat-icon">&#128268;</span> Works offline</h3>
+          <p>After the initial model download (~326 MB), everything is cached locally. No internet needed for text-to-speech.</p>
+        </div>
+        <div class="feat-item">
+          <h3><span class="feat-icon">&#128736;</span> Open source</h3>
+          <p>Fully available on GitHub. Read the code, file issues, send pull requests. Built in TypeScript with React and Vite.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- About -->
+  <div class="section" id="about">
+    <div class="container">
+      <div class="section-label">About</div>
+      <h2>The story behind unmute.page</h2>
+      <div class="story-section">
+        <div class="story-aside">
+          <div class="story-avatar">J</div>
+          <div>
+            <div class="story-name">Jakub</div>
+            <div class="story-role">Developer</div>
+          </div>
+          <div class="story-links">
+            <a href="https://buymeacoffee.com/jakubolek" target="_blank" rel="noopener">Buy me a coffee</a>
+            <a href="https://github.com/nicholasgasior/kokoro-web" target="_blank" rel="noopener">GitHub</a>
+          </div>
+        </div>
+        <div class="story-body">
+          <p>I was tired of subscription-based TTS tools. Every service wanted $10/month, required creating an account, and sent my text through their servers. I just wanted to listen to articles while cooking or walking. That shouldn't require a credit card.</p>
+          <p>So I built unmute.page. It uses the Kokoro TTS model, which runs entirely in your browser &mdash; no cloud processing, no API keys, no data leaving your device. It does one thing well: turns text into speech.</p>
+          <p>But I also built it for people like me who want to tweak things. You can pick different voices for different websites, adjust speed, enable sentence highlighting, define content areas with CSS selectors. It just works out of the box, but it rewards you for digging deeper.</p>
+          <p>This extension is free, open source, and will stay that way. If you find it useful and want to support development, I'd appreciate a coffee.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom CTA -->
+  <section class="bottom-cta" id="install">
+    <div class="container">
+      <h2>Give your eyes a break</h2>
+      <p>Free to install. Free to use. No account. No catch.</p>
+      <div class="bottom-buttons">
+        <a href="#install" class="btn-amber">Add to Chrome</a>
+        <a href="https://buymeacoffee.com/jakubolek" class="btn-coffee-warm" target="_blank" rel="noopener">&#9749; Buy me a coffee</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <span>unmute.page</span>
+        <a href="https://github.com/nicholasgasior/kokoro-web" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://buymeacoffee.com/jakubolek" target="_blank" rel="noopener">Buy me a coffee</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
