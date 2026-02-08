@@ -20,13 +20,7 @@ window.addEventListener('message', (event) => {
 
   switch (msg.type) {
     case 'LOAD_WAV': {
-      // msg.wavBase64: base64-encoded WAV data
-      const binary = atob(msg.wavBase64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], { type: 'audio/wav' });
+      const blob = new Blob([msg.wavData], { type: 'audio/wav' });
       const url = URL.createObjectURL(blob);
       if (audio.src && audio.src.startsWith('blob:')) {
         URL.revokeObjectURL(audio.src);

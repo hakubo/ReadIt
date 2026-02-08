@@ -24,18 +24,6 @@ function freeMemory() {
   releaseModel().catch(() => {});
 }
 
-function wavToBase64(waveform: Float32Array, sampleRate: number): string {
-  const wavBuffer = createWavBuffer(waveform as Float32Array<ArrayBuffer>, sampleRate);
-  const bytes = new Uint8Array(wavBuffer);
-  const chunks: string[] = [];
-  const chunkSize = 8192;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const slice = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-    chunks.push(String.fromCharCode.apply(null, slice as unknown as number[]));
-  }
-  return btoa(chunks.join(""));
-}
-
 async function generateAndSendWav(index: number, sentence: string, lang: string, voiceId: string) {
   const silence = createSilenceWaveform(PAUSE_AFTER_SENTENCE_MS);
 
@@ -51,12 +39,14 @@ async function generateAndSendWav(index: number, sentence: string, lang: string,
   withSilence.set(silence, result.waveform.length);
 
   const duration = withSilence.length / SAMPLE_RATE;
-  const wavBase64 = wavToBase64(withSilence, SAMPLE_RATE);
+  const wavData = createWavBuffer(withSilence as Float32Array<ArrayBuffer>, SAMPLE_RATE);
 
+  // Send ArrayBuffer directly via structured cloning (Chrome 118+),
+  // avoiding the 33% overhead of base64 encoding.
   chrome.runtime.sendMessage({
     type: "TTS_SENTENCE_WAV",
     index,
-    wavBase64,
+    wavData,
     duration,
   });
 }
