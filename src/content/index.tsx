@@ -3,6 +3,16 @@ import { SelectionButton } from "./SelectionButton";
 import { FloatingPlayer, type LoadingStatus, type PlayerState } from "./FloatingPlayer";
 import { type TTSSettings, type SitePrefs, type TextReplacementRule } from "@/shared/types";
 import { getEffectiveSettings, getDomainSettings, saveGlobalSettings, saveDomainSettings } from "@/shared/settings";
+import type {
+  ExtensionMessage,
+  PlayerIframeEvent,
+  PlayerIframeCommand,
+  GenerateTTSMessage,
+  AdvanceGenerationMessage,
+  RegenerateSentenceMessage,
+  FetchPageTitleMessage,
+  PlayerResetMessage,
+} from "@/shared/messaging";
 
 // Inject styles into shadow DOM
 const SHADOW_STYLES = `
@@ -859,7 +869,7 @@ let playerState: PlayerState = {
 // Audio playback engine state (extension iframe — bypasses page CSP, preserves pitch)
 let playerIframe: HTMLIFrameElement | null = null;
 let playerReady = false;
-let playerMsgQueue: Record<string, unknown>[] = [];
+let playerMsgQueue: PlayerIframeCommand[] = [];
 let sentenceWavData: (ArrayBuffer | null)[] = [];
 let sentenceDurations: number[] = [];
 let currentSentenceIdx = 0;
@@ -927,7 +937,7 @@ function ensurePlayerIframe(): HTMLIFrameElement {
 
   window.addEventListener("message", (e) => {
     if (e.source !== playerIframe?.contentWindow) {return;}
-    const msg = e.data;
+    const msg = e.data as PlayerIframeEvent;
     if (!msg || !msg.type) {return;}
 
     if (msg.type === "PLAYER_READY") {
@@ -965,7 +975,7 @@ function ensurePlayerIframe(): HTMLIFrameElement {
   return playerIframe;
 }
 
-function postToPlayer(msg: Record<string, unknown>) {
+function postToPlayer(msg: PlayerIframeCommand) {
   ensurePlayerIframe();
   if (!playerReady) {
     playerMsgQueue.push(msg);
@@ -1051,10 +1061,11 @@ function playCurrentSentence() {
   updatePlayer();
 
   // Advance windowed generation
-  chrome.runtime.sendMessage({
+  const advanceMsg: AdvanceGenerationMessage = {
     type: "ADVANCE_GENERATION",
     upTo: currentSentenceIdx + 15,
-  });
+  };
+  chrome.runtime.sendMessage(advanceMsg);
 }
 
 function handleLocalPlay() {
@@ -1098,10 +1109,11 @@ function handleSeekToSentence(idx: number) {
     playCurrentSentence();
   } else {
     // WAV not generated yet — tell offscreen to skip ahead and generate this sentence next
-    chrome.runtime.sendMessage({
+    const regenMsg: RegenerateSentenceMessage = {
       type: "REGENERATE_SENTENCE",
       index: idx,
-    });
+    };
+    chrome.runtime.sendMessage(regenMsg);
     playerState = { ...playerState, isPlaying: false, currentIndex: idx };
     updateHighlight(idx);
     updatePlayer();
@@ -1563,7 +1575,8 @@ function extractUrls(text: string): string[] {
 
 async function fetchPageTitle(url: string): Promise<string | null> {
   try {
-    const response = await chrome.runtime.sendMessage({ type: 'FETCH_PAGE_TITLE', url });
+    const msg: FetchPageTitleMessage = { type: "FETCH_PAGE_TITLE", url };
+    const response = await chrome.runtime.sendMessage(msg);
     return response?.title || null;
   } catch { return null; }
 }
@@ -2081,7 +2094,8 @@ function updatePlayer() {
 function stopPlayback() {
   closedManually = true;
   isFinished = false;
-  chrome.runtime.sendMessage({ type: "PLAYER_RESET" });
+  const resetMsg: PlayerResetMessage = { type: "PLAYER_RESET" };
+  chrome.runtime.sendMessage(resetMsg);
   cleanupAudioEngine();
   cleanupHighlighting();
   totalChunks = 0;
@@ -2168,11 +2182,12 @@ async function handleRead() {
   showPlayer();
 
   try {
-    const response = await chrome.runtime.sendMessage({
+    const genMsg: GenerateTTSMessage = {
       type: "GENERATE_TTS",
       sentences: processedSentences,
       settings,
-    });
+    };
+    const response = await chrome.runtime.sendMessage(genMsg);
 
     if (!response || !response.success) {
       throw new Error(response?.error || "TTS generation failed");
@@ -2240,7 +2255,7 @@ chrome.storage.onChanged.addListener(async (changes, areaName) => {
 });
 
 // Listen for messages from background
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message: ExtensionMessage) => {
   // When user pressed X, ignore all playback-related messages to prevent UI resurrection
   if (closedManually && [
     "TTS_PROGRESS", "TTS_STREAM_START", "TTS_AUDIO_CHUNK",
@@ -2261,7 +2276,7 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (message.type === "TTS_PROGRESS") {
-    loadingStatus = message.status as LoadingStatus;
+    loadingStatus = message.status;
     if (message.totalChunks) {totalChunks = message.totalChunks;}
     updatePlayer();
   }
@@ -2269,24 +2284,22 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message.type === "TTS_STREAM_START") {
     totalChunks = message.totalChunks;
     // Store generation context for regeneration requests
-    if (message.sentences) {
-      generationSentences = message.sentences as string[];
-      sentenceWavData = new Array(totalChunks).fill(null);
-      sentenceDurations = new Array(totalChunks).fill(0);
-      // Estimate total duration from text length (~14 chars/sec + 0.3s pause per sentence)
-      const CHARS_PER_SEC = 14;
-      const PAUSE_SEC = 0.3;
-      const totalChars = generationSentences.reduce((sum, s) => sum + s.length, 0);
-      initialEstimatedDuration = totalChars / CHARS_PER_SEC + generationSentences.length * PAUSE_SEC;
-      totalEstimatedDuration = initialEstimatedDuration;
-    }
+    generationSentences = message.sentences;
+    sentenceWavData = new Array(totalChunks).fill(null);
+    sentenceDurations = new Array(totalChunks).fill(0);
+    // Estimate total duration from text length (~14 chars/sec + 0.3s pause per sentence)
+    const CHARS_PER_SEC = 14;
+    const PAUSE_SEC = 0.3;
+    const totalChars = generationSentences.reduce((sum, s) => sum + s.length, 0);
+    initialEstimatedDuration = totalChars / CHARS_PER_SEC + generationSentences.length * PAUSE_SEC;
+    totalEstimatedDuration = initialEstimatedDuration;
     updatePlayer();
   }
 
   if (message.type === "TTS_SENTENCE_WAV") {
-    const idx = message.index as number;
-    const wavData = new Uint8Array(message.wavBytes as number[]).buffer;
-    const duration = message.duration as number;
+    const idx = message.index;
+    const wavData = new Uint8Array(message.wavBytes).buffer;
+    const duration = message.duration;
 
     // Ensure arrays are large enough
     while (sentenceWavData.length <= idx) {sentenceWavData.push(null);}

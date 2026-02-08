@@ -1,6 +1,20 @@
 // Background service worker for unmute.page extension
 // Manages offscreen document for TTS generation and audio playback
 
+import type {
+  ExtensionMessage,
+  GenerateTTSResponse,
+  TTSProgressMessage,
+  OffscreenGenerateTTSMessage,
+  OffscreenPreviewVoiceMessage,
+  PlayerResetMessage,
+  PlaybackInterruptedMessage,
+  ExtensionToggleMessage,
+  OpenSettingsMessage,
+  OffscreenPingMessage,
+} from "@/shared/messaging";
+import type { TTSSettings } from "@/shared/types";
+
 let creatingOffscreen: Promise<void> | null = null;
 let activeTabId: number | null = null;
 let offscreenIdleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -26,7 +40,8 @@ function setActiveTabId(id: number | null) {
 function pingOffscreen(): Promise<boolean> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(false), 2000);
-    chrome.runtime.sendMessage({ type: "OFFSCREEN_PING" }, (response) => {
+    const msg: OffscreenPingMessage = { type: "OFFSCREEN_PING" };
+    chrome.runtime.sendMessage(msg, (response) => {
       clearTimeout(timeout);
       if (chrome.runtime.lastError || !response?.pong) {
         resolve(false);
@@ -53,7 +68,7 @@ async function createOffscreenDocument() {
     // This prevents a race where we send a message before the listener exists.
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(resolve, 5000);
-      const listener = (msg: { type: string }) => {
+      const listener = (msg: ExtensionMessage) => {
         if (msg.type === "OFFSCREEN_READY") {
           clearTimeout(timeout);
           chrome.runtime.onMessage.removeListener(listener);
@@ -133,13 +148,15 @@ chrome.action.onClicked.addListener(async (tab) => {
 
   await chrome.storage.local.set({ [key]: { ...prefs, enabled: nowEnabled } });
 
-  chrome.tabs.sendMessage(tabId, { type: "EXTENSION_TOGGLE", enabled: nowEnabled }).catch(() => {});
+  const toggleMsg: ExtensionToggleMessage = { type: "EXTENSION_TOGGLE", enabled: nowEnabled };
+  chrome.tabs.sendMessage(tabId, toggleMsg).catch(() => {});
 });
 
 // Handle context menu click
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "kokoro-open-settings" && tab?.id) {
-    chrome.tabs.sendMessage(tab.id, { type: "OPEN_SETTINGS" }).catch(() => {});
+    const settingsMsg: OpenSettingsMessage = { type: "OPEN_SETTINGS" };
+    chrome.tabs.sendMessage(tab.id, settingsMsg).catch(() => {});
   }
 });
 
@@ -155,7 +172,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (tabId === activeTabId && changeInfo.status === "loading") {
     setActiveTabId(null);
     if (offscreenIdleTimer) { clearTimeout(offscreenIdleTimer); offscreenIdleTimer = null; }
-    chrome.runtime.sendMessage({ type: "PLAYER_RESET" }).catch(() => {});
+    const resetMsg: PlayerResetMessage = { type: "PLAYER_RESET" };
+    chrome.runtime.sendMessage(resetMsg).catch(() => {});
     closeOffscreenDocument();
   }
 });
@@ -203,17 +221,17 @@ async function fetchPageTitle(url: string): Promise<string | null> {
 const CACHE_NAME = "kokoro-tts-resources";
 const DL_BASE = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231";
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
   // Check Browser Cache API for model and voice files
   if (message.type === "CHECK_CACHE_STATUS") {
     (async () => {
       try {
         const cache = await caches.open(CACHE_NAME);
         const modelCached = !!(await cache.match(`${DL_BASE}/onnx/model.onnx`));
-        const voiceIds: string[] = message.voiceIds || [];
+        const voiceIds = message.voiceIds;
         const cachedVoices: string[] = [];
         await Promise.all(
-          voiceIds.map(async (id: string) => {
+          voiceIds.map(async (id) => {
             if (await cache.match(`${DL_BASE}/voices/${id}.bin`)) {
               cachedVoices.push(id);
             }
@@ -240,7 +258,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const newTabId = sender.tab?.id ?? null;
     // If another tab was playing, tell it to reset
     if (activeTabId && activeTabId !== newTabId) {
-      chrome.tabs.sendMessage(activeTabId, { type: "PLAYBACK_INTERRUPTED" }).catch(() => {});
+      const interruptMsg: PlaybackInterruptedMessage = { type: "PLAYBACK_INTERRUPTED" };
+      chrome.tabs.sendMessage(activeTabId, interruptMsg).catch(() => {});
     }
     setActiveTabId(newTabId);
     handleTTSRequest(message.sentences, message.settings)
@@ -258,7 +277,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "PREVIEW_VOICE") {
     setActiveTabId(sender.tab?.id ?? activeTabId);
     setupOffscreenDocument().then(() => {
-      chrome.runtime.sendMessage({ type: "OFFSCREEN_PREVIEW_VOICE", voiceId: message.voiceId });
+      const previewMsg: OffscreenPreviewVoiceMessage = { type: "OFFSCREEN_PREVIEW_VOICE", voiceId: message.voiceId };
+      chrome.runtime.sendMessage(previewMsg);
     });
     return true;
   }
@@ -308,28 +328,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-async function handleTTSRequest(sentences: string[], settings: unknown) {
+async function handleTTSRequest(sentences: string[], settings: TTSSettings): Promise<GenerateTTSResponse> {
   await setupOffscreenDocument();
-  forwardToActiveTab({ type: "TTS_PROGRESS", status: "starting" });
+  const progressMsg: TTSProgressMessage = { type: "TTS_PROGRESS", status: "starting" };
+  forwardToActiveTab(progressMsg);
 
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage(
-      {
-        type: "OFFSCREEN_GENERATE_TTS",
-        sentences,
-        settings,
-      },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          resolve({
-            success: false,
-            error: `TTS engine unavailable: ${chrome.runtime.lastError.message}`,
-          });
-          return;
-        }
-        resolve(response ?? { success: false, error: "No response from TTS engine" });
+    const genMsg: OffscreenGenerateTTSMessage = {
+      type: "OFFSCREEN_GENERATE_TTS",
+      sentences,
+      settings,
+    };
+    chrome.runtime.sendMessage(genMsg, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve({
+          success: false,
+          error: `TTS engine unavailable: ${chrome.runtime.lastError.message}`,
+        });
+        return;
       }
-    );
+      resolve(response ?? { success: false, error: "No response from TTS engine" });
+    });
   });
 }
 

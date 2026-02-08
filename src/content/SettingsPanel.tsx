@@ -9,22 +9,21 @@ import {
   saveDomainSettings,
   clearDomainSettings,
 } from "@/shared/settings";
+import type { ExtensionMessage, CheckCacheStatusMessage, PreviewVoiceMessage } from "@/shared/messaging";
 
 async function checkCacheStatus(): Promise<{ modelCached: boolean; cachedVoices: Set<string> }> {
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage(
-      { type: "CHECK_CACHE_STATUS", voiceIds: voices.map(v => v.id) },
-      (response) => {
-        if (chrome.runtime.lastError || !response) {
-          resolve({ modelCached: false, cachedVoices: new Set() });
-          return;
-        }
-        resolve({
-          modelCached: response.modelCached,
-          cachedVoices: new Set<string>(response.cachedVoices),
-        });
+    const msg: CheckCacheStatusMessage = { type: "CHECK_CACHE_STATUS", voiceIds: voices.map(v => v.id) };
+    chrome.runtime.sendMessage(msg, (response) => {
+      if (chrome.runtime.lastError || !response) {
+        resolve({ modelCached: false, cachedVoices: new Set() });
+        return;
       }
-    );
+      resolve({
+        modelCached: response.modelCached,
+        cachedVoices: new Set<string>(response.cachedVoices),
+      });
+    });
   });
 }
 
@@ -85,9 +84,9 @@ export function SettingsPanel({ position, onClose, domain, theme, visible = true
 
   // Listen for messages from offscreen/background
   useEffect(() => {
-    const listener = (message: { type: string; voiceId?: string; playing?: boolean }) => {
+    const listener = (message: ExtensionMessage) => {
       if (message.type === "PREVIEW_STATE") {
-        setPreviewingVoice(message.playing ? message.voiceId! : null);
+        setPreviewingVoice(message.playing ? message.voiceId : null);
       }
       if (message.type === "MODEL_DOWNLOAD_PROGRESS") {
         setModelDownloading(true);
@@ -97,12 +96,11 @@ export function SettingsPanel({ position, onClose, domain, theme, visible = true
         setModelCached(true);
       }
       if (message.type === "VOICE_DOWNLOAD_START") {
-        setDownloadingVoice(message.voiceId!);
+        setDownloadingVoice(message.voiceId);
       }
       if (message.type === "VOICE_DOWNLOAD_COMPLETE") {
-        const voiceId = message.voiceId!;
         setDownloadingVoice(null);
-        setCachedVoices(prev => new Set([...prev, voiceId]));
+        setCachedVoices(prev => new Set([...prev, message.voiceId]));
       }
     };
     chrome.runtime.onMessage.addListener(listener);
@@ -153,7 +151,8 @@ export function SettingsPanel({ position, onClose, domain, theme, visible = true
   };
 
   const previewVoice = (voiceId: string) => {
-    chrome.runtime.sendMessage({ type: "PREVIEW_VOICE", voiceId });
+    const msg: PreviewVoiceMessage = { type: "PREVIEW_VOICE", voiceId };
+    chrome.runtime.sendMessage(msg);
   };
 
   // Group voices by language

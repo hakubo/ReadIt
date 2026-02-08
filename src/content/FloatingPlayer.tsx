@@ -1,13 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, X, RotateCcw, Settings } from "lucide-react";
 import { SettingsPanel } from "./SettingsPanel";
+import type { LoadingStatus } from "@/shared/messaging";
 
-export type LoadingStatus =
-  | "starting"
-  | "phonemizing"
-  | "loading_model"
-  | "generating"
-  | "done";
+export type { LoadingStatus } from "@/shared/messaging";
 
 export interface PlayerState {
   isPlaying: boolean;

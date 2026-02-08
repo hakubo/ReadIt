@@ -9,6 +9,7 @@ import {
   saveDomainSettings,
   clearDomainSettings,
 } from "@/shared/settings";
+import type { ExtensionMessage, PreviewVoiceMessage } from "@/shared/messaging";
 
 function formatDomain(domain: string): string {
   const d = domain.replace(/^www\./, "");
@@ -52,7 +53,7 @@ export function Popup() {
 
   // Listen for PREVIEW_STATE messages from offscreen
   useEffect(() => {
-    const listener = (message: { type: string; voiceId: string; playing: boolean }) => {
+    const listener = (message: ExtensionMessage) => {
       if (message.type === "PREVIEW_STATE") {
         setPreviewingVoice(message.playing ? message.voiceId : null);
       }
@@ -113,7 +114,8 @@ export function Popup() {
   };
 
   const previewVoice = (voiceId: string) => {
-    chrome.runtime.sendMessage({ type: "PREVIEW_VOICE", voiceId });
+    const msg: PreviewVoiceMessage = { type: "PREVIEW_VOICE", voiceId };
+    chrome.runtime.sendMessage(msg);
   };
 
   // Group voices by language

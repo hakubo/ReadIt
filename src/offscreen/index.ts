@@ -2,6 +2,22 @@ import { generateVoice, isSessionCached, preloadModel, releaseModel } from "@/li
 import { createWavBuffer } from "@/lib/kokoro/createWavBuffer";
 import { voicesMap, isVoiceCached } from "@/lib/resources";
 import { DEFAULT_SETTINGS, type TTSSettings } from "@/shared/types";
+import type {
+  ExtensionMessage,
+  GenerateTTSResponse,
+  TTSSentenceWavMessage,
+  TTSStreamStartMessage,
+  TTSProgressMessage,
+  TTSAudioChunkMessage,
+  TTSStreamEndMessage,
+  ModelDownloadProgressMessage,
+  ModelDownloadCompleteMessage,
+  VoiceDownloadStartMessage,
+  VoiceDownloadCompleteMessage,
+  PreviewStateMessage,
+  OffscreenReadyMessage,
+  OffscreenPingResponse,
+} from "@/shared/messaging";
 
 const SAMPLE_RATE = 24000;
 const PAUSE_AFTER_SENTENCE_MS = 300;
@@ -43,18 +59,19 @@ async function generateAndSendWav(index: number, sentence: string, lang: string,
 
   // Chrome extension messaging is JSON-serialized, so ArrayBuffer can't
   // be sent directly. Convert to a plain number array for transit.
-  chrome.runtime.sendMessage({
+  const wavMsg: TTSSentenceWavMessage = {
     type: "TTS_SENTENCE_WAV",
     index,
     wavBytes: Array.from(new Uint8Array(wavData)),
     duration,
-  });
+  };
+  chrome.runtime.sendMessage(wavMsg);
 }
 
 async function handleGenerateTTSStreaming(
   preSplitSentences: string[],
   settings: TTSSettings = DEFAULT_SETTINGS,
-) {
+): Promise<GenerateTTSResponse> {
   const voicesList = settings.voices;
   const selectedVoiceId = voicesList[Math.floor(Math.random() * voicesList.length)];
   const voice = voicesMap[selectedVoiceId as keyof typeof voicesMap];
@@ -63,13 +80,15 @@ async function handleGenerateTTSStreaming(
   // Load model if not cached
   if (!isSessionCached()) {
     await preloadModel((downloaded, total) => {
-      chrome.runtime.sendMessage({
+      const dlMsg: ModelDownloadProgressMessage = {
         type: "MODEL_DOWNLOAD_PROGRESS",
         downloaded,
         total,
-      });
+      };
+      chrome.runtime.sendMessage(dlMsg);
     });
-    chrome.runtime.sendMessage({ type: "MODEL_DOWNLOAD_COMPLETE" });
+    const dlCompleteMsg: ModelDownloadCompleteMessage = { type: "MODEL_DOWNLOAD_COMPLETE" };
+    chrome.runtime.sendMessage(dlCompleteMsg);
   }
 
   // Content script pre-splits and pre-processes sentences to ensure
@@ -84,13 +103,14 @@ async function handleGenerateTTSStreaming(
   generateResolve = null;
   priorityIndex = -1;
 
-  chrome.runtime.sendMessage({
+  const startMsg: TTSStreamStartMessage = {
     type: "TTS_STREAM_START",
     totalChunks: totalSentences,
     sentences,
     lang,
     voiceId: selectedVoiceId,
-  });
+  };
+  chrome.runtime.sendMessage(startMsg);
 
   const generated = new Set<number>(); // Track which sentences have been generated
   let voiceDownloadNotified = false;
@@ -134,19 +154,21 @@ async function handleGenerateTTSStreaming(
     }
 
     const status = i === 0 && !isSessionCached()
-      ? "loading_model"
-      : "generating";
-    chrome.runtime.sendMessage({
+      ? "loading_model" as const
+      : "generating" as const;
+    const progressMsg: TTSProgressMessage = {
       type: "TTS_PROGRESS",
       status,
       currentChunk: i + 1,
       totalChunks: totalSentences,
-    });
+    };
+    chrome.runtime.sendMessage(progressMsg);
 
     try {
       if (!voiceDownloadNotified && !voiceCached) {
         voiceDownloadNotified = true;
-        chrome.runtime.sendMessage({ type: "VOICE_DOWNLOAD_START", voiceId: selectedVoiceId });
+        const vdStartMsg: VoiceDownloadStartMessage = { type: "VOICE_DOWNLOAD_START", voiceId: selectedVoiceId };
+        chrome.runtime.sendMessage(vdStartMsg);
       }
       await generateAndSendWav(i, sentences[i], lang, selectedVoiceId);
       generated.add(i);
@@ -154,14 +176,16 @@ async function handleGenerateTTSStreaming(
       // Notify voice download complete after first successful generation
       // (voice file is now cached)
       if (generated.size === 1 && voiceDownloadNotified) {
-        chrome.runtime.sendMessage({ type: "VOICE_DOWNLOAD_COMPLETE", voiceId: selectedVoiceId });
+        const vdCompleteMsg: VoiceDownloadCompleteMessage = { type: "VOICE_DOWNLOAD_COMPLETE", voiceId: selectedVoiceId };
+        chrome.runtime.sendMessage(vdCompleteMsg);
       }
 
-      chrome.runtime.sendMessage({
+      const chunkMsg: TTSAudioChunkMessage = {
         type: "TTS_AUDIO_CHUNK",
         chunkIndex: i,
         totalChunks: totalSentences,
-      });
+      };
+      chrome.runtime.sendMessage(chunkMsg);
     } catch (error) {
       console.error(`Error generating chunk ${i}:`, error);
     }
@@ -170,18 +194,18 @@ async function handleGenerateTTSStreaming(
   isGenerating = false;
 
   if (!abortGeneration) {
-    chrome.runtime.sendMessage({
-      type: "TTS_STREAM_END",
-    });
+    const endMsg: TTSStreamEndMessage = { type: "TTS_STREAM_END" };
+    chrome.runtime.sendMessage(endMsg);
   }
 
   return { success: true, streaming: true };
 }
 
 // Listen for messages
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
   if (message.type === "OFFSCREEN_PING") {
-    sendResponse({ pong: true });
+    const pong: OffscreenPingResponse = { pong: true };
+    sendResponse(pong);
     return;
   }
 
@@ -218,13 +242,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === "ADVANCE_GENERATION") {
-    const newUpTo = message.upTo as number;
+    const newUpTo = message.upTo;
     if (newUpTo > generateUpTo) {generateUpTo = newUpTo;}
     if (generateResolve) {generateResolve();}
   }
 
   if (message.type === "REGENERATE_SENTENCE") {
-    const idx = message.index as number;
+    const idx = message.index;
     // Tell the main generation loop to prioritize this sentence next.
     // Also advance the window so generation continues from there.
     priorityIndex = idx;
@@ -259,11 +283,13 @@ async function handlePreviewVoice(voiceId: string) {
   cleanupPreviewAudio();
 
   if (isGenerating) {
-    chrome.runtime.sendMessage({ type: "PREVIEW_STATE", voiceId, playing: false });
+    const stateMsg: PreviewStateMessage = { type: "PREVIEW_STATE", voiceId, playing: false };
+    chrome.runtime.sendMessage(stateMsg);
     return;
   }
 
-  chrome.runtime.sendMessage({ type: "PREVIEW_STATE", voiceId, playing: true });
+  const playingMsg: PreviewStateMessage = { type: "PREVIEW_STATE", voiceId, playing: true };
+  chrome.runtime.sendMessage(playingMsg);
   isGenerating = true;
   try {
     const voice = voicesMap[voiceId as keyof typeof voicesMap];
@@ -278,12 +304,14 @@ async function handlePreviewVoice(voiceId: string) {
     previewAudio = new Audio(previewBlobUrl);
     previewAudio.addEventListener("ended", () => {
       cleanupPreviewAudio();
-      chrome.runtime.sendMessage({ type: "PREVIEW_STATE", voiceId, playing: false });
+      const endedMsg: PreviewStateMessage = { type: "PREVIEW_STATE", voiceId, playing: false };
+      chrome.runtime.sendMessage(endedMsg);
     });
     await previewAudio.play();
   } catch {
     cleanupPreviewAudio();
-    chrome.runtime.sendMessage({ type: "PREVIEW_STATE", voiceId, playing: false });
+    const errMsg: PreviewStateMessage = { type: "PREVIEW_STATE", voiceId, playing: false };
+    chrome.runtime.sendMessage(errMsg);
   }
   isGenerating = false;
 }
@@ -291,4 +319,5 @@ async function handlePreviewVoice(voiceId: string) {
 console.log("unmute.page offscreen document loaded");
 
 // Signal to background that the message listener is ready
-chrome.runtime.sendMessage({ type: "OFFSCREEN_READY" });
+const readyMsg: OffscreenReadyMessage = { type: "OFFSCREEN_READY" };
+chrome.runtime.sendMessage(readyMsg);
