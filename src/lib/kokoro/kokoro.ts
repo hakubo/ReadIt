@@ -13,6 +13,10 @@ let cachedSession: Awaited<
   ReturnType<typeof import("onnxruntime-web/webgpu").InferenceSession.create>
 > | null = null;
 
+// Guards against concurrent preloadModel() calls — if a preload is in flight,
+// subsequent callers await the same promise instead of downloading again.
+let preloadPromise: Promise<void> | null = null;
+
 // Cache voice data to avoid re-fetching/reshaping on every sentence
 let cachedVoiceId = "";
 let cachedVoice: number[][][] | null = null;
@@ -49,14 +53,26 @@ export async function releaseModel(): Promise<void> {
 export async function preloadModel(
   onProgress?: (downloaded: number, total: number) => void,
 ): Promise<void> {
-  if (cachedSession) {return;}
-  const ort = getOnnxRuntime();
-  const modelBuffer = await getModel(onProgress);
-  cachedSession = await ort.InferenceSession.create(modelBuffer, {
-    executionProviders: [acceleration],
-    preferredOutputLocation: "cpu-pinned",
+  if (cachedSession) {
+    return;
+  }
+  if (preloadPromise) {
+    return preloadPromise;
+  }
+
+  preloadPromise = (async () => {
+    const ort = getOnnxRuntime();
+    const modelBuffer = await getModel(onProgress);
+    cachedSession = await ort.InferenceSession.create(modelBuffer, {
+      executionProviders: [acceleration],
+      preferredOutputLocation: "cpu-pinned",
+    });
+    console.log(`Model loaded (${acceleration})`);
+  })().finally(() => {
+    preloadPromise = null;
   });
-  console.log(`Model loaded (${acceleration})`);
+
+  return preloadPromise;
 }
 
 /**
