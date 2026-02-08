@@ -902,10 +902,6 @@ let highlightResizeHandler: (() => void) | null = null;
 let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let highlightStyleEl: HTMLStyleElement | null = null;
 
-// Debug overlay state
-let debugOverlayVisible = false;
-let debugOverlayEl: HTMLDivElement | null = null;
-
 // Selector preview highlight (shown when input is focused)
 let selectorPreviewHighlight: HTMLDivElement | null = null;
 let selectorInputFocused = false;
@@ -1154,86 +1150,6 @@ function updateSeekCursor() {
     document.body.classList.remove("unmute-reading");
     seekCursorStyle.remove();
     seekCursorStyle = null;
-  }
-}
-
-function updateDebugOverlay() {
-  if (!debugOverlayVisible) {
-    if (debugOverlayEl) {
-      debugOverlayEl.remove();
-      debugOverlayEl = null;
-    }
-    return;
-  }
-
-  if (!debugOverlayEl) {
-    debugOverlayEl = document.createElement("div");
-    debugOverlayEl.id = "unmute-debug";
-    debugOverlayEl.style.cssText = `
-      position: fixed;
-      bottom: 12px;
-      left: 12px;
-      max-width: 420px;
-      max-height: 50vh;
-      overflow-y: auto;
-      background: rgba(0,0,0,0.88);
-      color: #e5e7eb;
-      font-family: ui-monospace, monospace;
-      font-size: 11px;
-      line-height: 1.5;
-      padding: 8px 10px;
-      border-radius: 8px;
-      z-index: 2147483647;
-    `;
-    debugOverlayEl.addEventListener("click", (e) => {
-      const row = (e.target as HTMLElement).closest("[data-sidx]") as HTMLElement | null;
-      if (row) {
-        const idx = parseInt(row.dataset.sidx!, 10);
-        handleSeekToSentence(idx);
-      }
-    });
-    document.body.appendChild(debugOverlayEl);
-  }
-
-  const generated = sentenceWavBase64.filter(d => d !== null).length;
-  const total = totalChunks || sentences.length;
-  const phase = playerState.isPlaying ? "playing" : (isLoading ? "loading" : "idle");
-  const idx = currentSentenceIdx;
-
-  // Clear and rebuild
-  debugOverlayEl.textContent = "";
-
-  // Header
-  const header = document.createElement("div");
-  header.style.cssText = "color:#9ca3af;margin-bottom:4px;pointer-events:none";
-  header.innerHTML =
-    `<b style="color:white">Debug</b> &nbsp; ${phase} &nbsp; ` +
-    `${generated}/${total} generated &nbsp; idx=${idx} &nbsp; ` +
-    `t=${totalElapsedTime.toFixed(1)}s / ${totalEstimatedDuration.toFixed(1)}s`;
-  debugOverlayEl.appendChild(header);
-
-  // Sentence rows
-  for (let i = 0; i < Math.max(total, sentences.length); i++) {
-    const hasWav = sentenceWavBase64[i] != null;
-    const isCurrent = i === idx;
-    const text = sentences[i] || `(sentence ${i})`;
-    const truncated = text.length > 60 ? text.slice(0, 57) + "..." : text;
-    const dur = sentenceDurations[i];
-    const timeInfo = dur ? ` [${dur.toFixed(1)}s]` : "";
-
-    const row = document.createElement("div");
-    row.dataset.sidx = String(i);
-    const bg = isCurrent ? "rgba(59,130,246,0.3)" : "transparent";
-    const cursor = hasWav ? "pointer" : "default";
-    row.style.cssText = `background:${bg};padding:1px 4px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:${cursor}`;
-
-    const color = hasWav ? "#86efac" : "#6b7280";
-    const icon = hasWav ? (isCurrent ? "\u25B6" : "\u2713") : "\u2022";
-    row.innerHTML =
-      `<span style="color:${color}">${icon} ${i}</span> ` +
-      `<span style="color:${isCurrent ? "white" : "#d1d5db"}">${truncated}</span>` +
-      `<span style="color:#6b7280">${timeInfo}</span>`;
-    debugOverlayEl.appendChild(row);
   }
 }
 
@@ -2158,7 +2074,6 @@ function updatePlayer() {
   if (playerRoot) {
     showPlayer();
   }
-  updateDebugOverlay();
   updateSeekCursor();
 }
 
@@ -2169,8 +2084,6 @@ function stopPlayback() {
   chrome.runtime.sendMessage({ type: "PLAYER_RESET" });
   cleanupAudioEngine();
   cleanupHighlighting();
-  debugOverlayVisible = false;
-  updateDebugOverlay();
   totalChunks = 0;
   isStreaming = false;
   totalElapsedTime = 0;
@@ -2423,8 +2336,6 @@ chrome.runtime.onMessage.addListener((message) => {
     isFinished = false;
     cleanupAudioEngine();
     cleanupHighlighting();
-    debugOverlayVisible = false;
-    updateDebugOverlay();
     totalChunks = 0;
     isStreaming = false;
     totalElapsedTime = 0;
@@ -2524,8 +2435,8 @@ document.addEventListener("click", (e) => {
   if ((!hasAudio && !isLoading && !isStreaming) || sentences.length === 0) {return;}
 
   const target = e.target as HTMLElement;
-  // Skip clicks on our UI, interactive elements, or debug overlay
-  if (target.closest("#unmute-player, #unmute-selection-button, #unmute-debug")) {return;}
+  // Skip clicks on our UI or interactive elements
+  if (target.closest("#unmute-player, #unmute-selection-button")) {return;}
   if (target.closest("a, button, input, select, textarea, [role='button']")) {return;}
 
   const idx = getSentenceIndexAtPoint(e.clientX, e.clientY);
@@ -2647,13 +2558,6 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
-  // Toggle debug overlay
-  if (e.key === "d" || e.key === "D") {
-    capture();
-    debugOverlayVisible = !debugOverlayVisible;
-    updateDebugOverlay();
-    return;
-  }
 });
 
 // Init: load per-domain prefs and global settings, then show player
