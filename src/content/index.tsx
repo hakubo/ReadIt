@@ -860,6 +860,7 @@ let playerState: PlayerState = {
 let playerIframe: HTMLIFrameElement | null = null;
 let playerReady = false;
 let playerMsgQueue: Record<string, unknown>[] = [];
+const EXTENSION_ORIGIN = new URL(chrome.runtime.getURL("")).origin;
 let sentenceWavData: (ArrayBuffer | null)[] = [];
 let sentenceDurations: number[] = [];
 let currentSentenceIdx = 0;
@@ -927,13 +928,14 @@ function ensurePlayerIframe(): HTMLIFrameElement {
 
   window.addEventListener("message", (e) => {
     if (e.source !== playerIframe?.contentWindow) {return;}
+    if (e.origin !== EXTENSION_ORIGIN) {return;}
     const msg = e.data;
     if (!msg || !msg.type) {return;}
 
     if (msg.type === "PLAYER_READY") {
       playerReady = true;
       for (const queued of playerMsgQueue) {
-        playerIframe?.contentWindow?.postMessage(queued, "*");
+        playerIframe?.contentWindow?.postMessage(queued, EXTENSION_ORIGIN);
       }
       playerMsgQueue = [];
     }
@@ -971,7 +973,7 @@ function postToPlayer(msg: Record<string, unknown>) {
     playerMsgQueue.push(msg);
     return;
   }
-  playerIframe?.contentWindow?.postMessage(msg, "*");
+  playerIframe?.contentWindow?.postMessage(msg, EXTENSION_ORIGIN);
 }
 
 function computeElapsedTime(): number {
