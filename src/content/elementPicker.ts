@@ -1,0 +1,358 @@
+// Element picker: visual CSS selector picker for choosing content areas.
+// All state is encapsulated in an ElementPicker instance.
+
+import { detectContentElement } from "./contentDetection";
+
+export class ElementPicker {
+  private active = false;
+  private overlay: HTMLDivElement | null = null;
+  private highlight: HTMLDivElement | null = null;
+  private tooltip: HTMLDivElement | null = null;
+  private extraHighlights: HTMLDivElement[] = [];
+  private autoDetectHighlight: HTMLDivElement | null = null;
+
+  // Selector preview state (shown when settings input is focused)
+  private previewHighlight: HTMLDivElement | null = null;
+
+  isActive(): boolean {
+    return this.active;
+  }
+
+  /** Generate a unique-ish CSS selector for an element. */
+  private generateSelector(el: Element): string {
+    if (el.id) {return `#${el.id}`;}
+
+    const tag = el.tagName.toLowerCase();
+
+    function isUnique(sel: string): boolean {
+      try {
+        const matches = document.querySelectorAll(sel);
+        return matches.length === 1 && matches[0] === el;
+      } catch { return false; }
+    }
+
+    function parentPrefix(): string {
+      const parts: string[] = [];
+      let ancestor = el.parentElement;
+      for (let depth = 0; depth < 2 && ancestor; depth++, ancestor = ancestor.parentElement) {
+        if (ancestor.id) { parts.unshift(`#${ancestor.id}`); return parts.join(" > "); }
+        parts.unshift(ancestor.tagName.toLowerCase());
+      }
+      return parts.join(" > ");
+    }
+
+    const semanticTags = ["main", "article", "nav", "aside", "header", "footer", "section"];
+    if (semanticTags.includes(tag) && isUnique(tag)) {return tag;}
+
+    const role = el.getAttribute("role");
+    if (role) {
+      const sel = `[role="${CSS.escape(role)}"]`;
+      if (isUnique(sel)) {return sel;}
+    }
+
+    const contentDataAttrs = [
+      "data-content", "data-main", "data-main-content", "data-article",
+      "data-body", "data-page-content", "data-post", "data-post-content",
+      "data-entry", "data-entry-content", "data-text", "data-story",
+      "data-testid", "data-component", "data-section", "data-block",
+      "data-container", "data-region", "data-area",
+    ];
+    for (const attr of contentDataAttrs) {
+      if (el.hasAttribute(attr)) {
+        const val = el.getAttribute(attr)!;
+        const sel = val
+          ? `[${attr}="${CSS.escape(val)}"]`
+          : `[${attr}]`;
+        if (isUnique(sel)) {return sel;}
+      }
+    }
+    for (const attr of el.getAttributeNames()) {
+      if (!attr.startsWith("data-")) {continue;}
+      if (/content|article|main|body|post|entry|story/i.test(attr)) {
+        const val = el.getAttribute(attr)!;
+        const sel = val
+          ? `[${attr}="${CSS.escape(val)}"]`
+          : `[${attr}]`;
+        if (isUnique(sel)) {return sel;}
+      }
+    }
+
+    const ariaLabel = el.getAttribute("aria-label");
+    if (ariaLabel) {
+      const sel = `${tag}[aria-label="${CSS.escape(ariaLabel)}"]`;
+      if (isUnique(sel)) {return sel;}
+    }
+
+    if (el.className && typeof el.className === "string") {
+      const classes = el.className.trim().split(/\s+/).filter(c =>
+        c.length > 0 && !c.startsWith("_") && !c.startsWith("css-") && !/^[a-z]{1,2}\d/.test(c)
+      );
+      for (const cls of classes) {
+        const sel = `${tag}.${CSS.escape(cls)}`;
+        if (isUnique(sel)) {return sel;}
+      }
+      const prefix = parentPrefix();
+      if (prefix) {
+        for (const cls of classes) {
+          const sel = `${prefix} > ${tag}.${CSS.escape(cls)}`;
+          if (isUnique(sel)) {return sel;}
+        }
+      }
+    }
+
+    const parent = el.parentElement;
+    if (parent?.id) {
+      const sel = `#${parent.id} > ${tag}`;
+      if (isUnique(sel)) {return sel;}
+    }
+
+    if (parent) {
+      const siblings = Array.from(parent.children).filter(c => c.tagName === el.tagName);
+      const idx = siblings.indexOf(el) + 1;
+      const prefix = parentPrefix();
+      const sel = `${prefix} > ${tag}:nth-of-type(${idx})`;
+      if (isUnique(sel)) {return sel;}
+    }
+
+    return tag;
+  }
+
+  /** Show a preview outline for the current content selector. */
+  showSelectorPreview(selector: string | undefined): void {
+    this.hideSelectorPreview();
+    if (!selector) {return;}
+    let matches: NodeListOf<Element>;
+    try { matches = document.querySelectorAll(selector); } catch { return; }
+    if (matches.length === 0) {return;}
+
+    const isUnique = matches.length === 1;
+    const color = isUnique ? "rgba(96,165,250,0.9)" : "rgba(239,68,68,0.9)";
+    const bg = isUnique ? "rgba(96,165,250,0.06)" : "rgba(239,68,68,0.06)";
+
+    const rect = matches[0].getBoundingClientRect();
+    this.previewHighlight = document.createElement("div");
+    this.previewHighlight.style.cssText = `
+      position: fixed; pointer-events: none; z-index: 2147483645;
+      border: 2px solid ${color}; background: ${bg};
+      border-radius: 4px;
+      left: ${rect.left}px; top: ${rect.top}px;
+      width: ${rect.width}px; height: ${rect.height}px;
+    `;
+
+    if (!isUnique) {
+      for (let i = 1; i < matches.length; i++) {
+        const r = matches[i].getBoundingClientRect();
+        const extra = document.createElement("div");
+        extra.className = "selector-preview-extra";
+        extra.style.cssText = `
+          position: fixed; pointer-events: none; z-index: 2147483645;
+          border: 2px dashed rgba(239,68,68,0.6);
+          border-radius: 4px;
+          left: ${r.left}px; top: ${r.top}px;
+          width: ${r.width}px; height: ${r.height}px;
+        `;
+        this.previewHighlight.appendChild(extra);
+      }
+    }
+
+    document.documentElement.appendChild(this.previewHighlight);
+  }
+
+  /** Hide the selector preview outline. */
+  hideSelectorPreview(): void {
+    if (this.previewHighlight) {
+      this.previewHighlight.remove();
+      this.previewHighlight = null;
+    }
+  }
+
+  /**
+   * Start the element picker UI.
+   * Returns a promise that resolves with the selected CSS selector, or null if cancelled.
+   */
+  start(onSelect: (selector: string) => void, onCancel: () => void): void {
+    if (this.active) {return;}
+    this.active = true;
+
+    let lastHoveredElement: Element | null = null;
+
+    this.overlay = document.createElement("div");
+    this.overlay.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      z-index: 2147483646; cursor: crosshair;
+    `;
+
+    this.highlight = document.createElement("div");
+    this.highlight.style.cssText = `
+      position: fixed; pointer-events: none; z-index: 2147483646;
+      border: 2px solid #3b82f6; background: rgba(59,130,246,0.1);
+      border-radius: 4px; transition: all 0.05s ease;
+      display: none;
+    `;
+
+    this.tooltip = document.createElement("div");
+    this.tooltip.style.cssText = `
+      position: fixed; pointer-events: none; z-index: 2147483647;
+      background: #1f2937; color: #e5e7eb; font-size: 11px;
+      font-family: ui-monospace, monospace; padding: 4px 8px;
+      border-radius: 4px; white-space: nowrap; display: none;
+    `;
+
+    document.documentElement.appendChild(this.overlay);
+    document.documentElement.appendChild(this.highlight);
+    document.documentElement.appendChild(this.tooltip);
+
+    // Show purple outline on the auto-detected content element
+    const autoDetected = detectContentElement();
+    if (autoDetected) {
+      const adRect = autoDetected.getBoundingClientRect();
+      this.autoDetectHighlight = document.createElement("div");
+      this.autoDetectHighlight.style.cssText = `
+        position: fixed; pointer-events: none; z-index: 2147483645;
+        border: 2px dashed #a855f7; background: rgba(168,85,247,0.06);
+        border-radius: 4px;
+        left: ${adRect.left}px; top: ${adRect.top}px;
+        width: ${adRect.width}px; height: ${adRect.height}px;
+      `;
+      const label = document.createElement("div");
+      label.style.cssText = `
+        position: absolute; top: 4px; left: 4px;
+        background: rgba(168,85,247,0.85); color: white; font-size: 10px;
+        font-family: system-ui, sans-serif; padding: 2px 6px;
+        border-radius: 3px; white-space: nowrap;
+      `;
+      label.textContent = "Default content area";
+      this.autoDetectHighlight.appendChild(label);
+      document.documentElement.appendChild(this.autoDetectHighlight);
+    }
+
+    const clearExtraHighlights = () => {
+      for (const h of this.extraHighlights) {h.remove();}
+      this.extraHighlights = [];
+    };
+
+    const peekElementAt = (x: number, y: number): Element | null => {
+      this.overlay!.style.pointerEvents = "none";
+      this.highlight!.style.display = "none";
+      if (this.autoDetectHighlight) {this.autoDetectHighlight.style.display = "none";}
+      for (const h of this.extraHighlights) {h.style.display = "none";}
+      const el = document.elementFromPoint(x, y);
+      this.overlay!.style.pointerEvents = "auto";
+      this.highlight!.style.display = lastHoveredElement ? "block" : "none";
+      if (this.autoDetectHighlight) {this.autoDetectHighlight.style.display = "block";}
+      for (const h of this.extraHighlights) {h.style.display = "block";}
+      if (!el || el === this.overlay || el === this.highlight || el === this.tooltip ||
+          el === this.autoDetectHighlight ||
+          el.closest("#unmute-player, #unmute-selection-button")) {
+        return null;
+      }
+      return el;
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      clearExtraHighlights();
+      const target = peekElementAt(e.clientX, e.clientY);
+      if (!target) {
+        this.highlight!.style.display = "none";
+        this.tooltip!.style.display = "none";
+        lastHoveredElement = null;
+        return;
+      }
+
+      lastHoveredElement = target;
+      const selector = this.generateSelector(target);
+      let matchCount = 1;
+      try { matchCount = document.querySelectorAll(selector).length; } catch { matchCount = 0; }
+      const isUnique = matchCount === 1;
+
+      const rect = target.getBoundingClientRect();
+      this.highlight!.style.display = "block";
+      this.highlight!.style.left = `${rect.left}px`;
+      this.highlight!.style.top = `${rect.top}px`;
+      this.highlight!.style.width = `${rect.width}px`;
+      this.highlight!.style.height = `${rect.height}px`;
+      this.highlight!.style.borderColor = isUnique ? "#3b82f6" : "#ef4444";
+      this.highlight!.style.background = isUnique ? "rgba(59,130,246,0.1)" : "rgba(239,68,68,0.1)";
+
+      const warning = !isUnique
+        ? (matchCount === 0 ? " — no matches" : ` — matches ${matchCount} elements`)
+        : "";
+      this.tooltip!.textContent = selector + warning;
+      this.tooltip!.style.background = isUnique ? "#1f2937" : "#7f1d1d";
+      this.tooltip!.style.display = "block";
+      this.tooltip!.style.left = `${Math.min(e.clientX + 12, window.innerWidth - 200)}px`;
+      this.tooltip!.style.top = `${Math.min(e.clientY + 16, window.innerHeight - 30)}px`;
+
+      if (!isUnique && matchCount > 1) {
+        try {
+          const allMatches = document.querySelectorAll(selector);
+          for (const matched of allMatches) {
+            if (matched === target) {continue;}
+            const r = matched.getBoundingClientRect();
+            if (r.width === 0 || r.height === 0) {continue;}
+            const box = document.createElement("div");
+            box.style.cssText = `
+              position: fixed; pointer-events: none; z-index: 2147483646;
+              border: 2px dashed #ef4444; background: rgba(239,68,68,0.08);
+              border-radius: 4px;
+              left: ${r.left}px; top: ${r.top}px;
+              width: ${r.width}px; height: ${r.height}px;
+            `;
+            document.documentElement.appendChild(box);
+            this.extraHighlights.push(box);
+          }
+        } catch { /* invalid selector */ }
+      }
+    };
+
+    const onClick = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const target = peekElementAt(e.clientX, e.clientY) || lastHoveredElement;
+      if (target) {
+        const selector = this.generateSelector(target);
+        onSelect(selector);
+      } else {
+        onCancel();
+      }
+
+      this.stop();
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCancel();
+        this.stop();
+      }
+    };
+
+    this.overlay.addEventListener("mousemove", onMouseMove);
+    this.overlay.addEventListener("click", onClick);
+    document.addEventListener("keydown", onKeyDown);
+
+    (this.overlay as unknown as { _cleanup: () => void })._cleanup = () => {
+      this.overlay?.removeEventListener("mousemove", onMouseMove);
+      this.overlay?.removeEventListener("click", onClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }
+
+  /** Stop the element picker and remove all UI. */
+  stop(): void {
+    if (!this.active) {return;}
+    this.active = false;
+
+    if (this.overlay) {
+      (this.overlay as unknown as { _cleanup?: () => void })._cleanup?.();
+      this.overlay.remove();
+      this.overlay = null;
+    }
+    if (this.highlight) { this.highlight.remove(); this.highlight = null; }
+    for (const h of this.extraHighlights) {h.remove();}
+    this.extraHighlights = [];
+    if (this.autoDetectHighlight) { this.autoDetectHighlight.remove(); this.autoDetectHighlight = null; }
+    if (this.tooltip) { this.tooltip.remove(); this.tooltip = null; }
+  }
+}
