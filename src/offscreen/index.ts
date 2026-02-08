@@ -27,11 +27,13 @@ function freeMemory() {
 function wavToBase64(waveform: Float32Array, sampleRate: number): string {
   const wavBuffer = createWavBuffer(waveform as Float32Array<ArrayBuffer>, sampleRate);
   const bytes = new Uint8Array(wavBuffer);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const chunks: string[] = [];
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const slice = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    chunks.push(String.fromCharCode.apply(null, slice as unknown as number[]));
   }
-  return btoa(binary);
+  return btoa(chunks.join(""));
 }
 
 async function generateAndSendWav(index: number, sentence: string, lang: string, voiceFormula: string) {
