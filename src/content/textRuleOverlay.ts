@@ -126,13 +126,14 @@ export class TextRuleOverlay {
     pattern: string,
     flags: string,
     replacement: string,
+    root?: Element,
   ): number {
     this.hideRulePreview();
     if (!pattern) {
       return 0;
     }
 
-    const matches = findTextMatches(pattern, flags, replacement);
+    const matches = findTextMatches(pattern, flags, replacement, root);
     if (matches.length === 0) {
       return 0;
     }

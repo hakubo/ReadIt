@@ -5,7 +5,7 @@ import { type TTSSettings, type SitePrefs, DEFAULT_NOISE_SELECTORS } from "@/sha
 import { getEffectiveSettings, getDomainSettings, saveGlobalSettings, saveDomainSettings } from "@/shared/settings";
 import { setPlaybackState } from "./playerStore";
 import { SHADOW_STYLES } from "./styles";
-import { detectMainContent, setNoiseSelector } from "./contentDetection";
+import { detectMainContent, detectContentElement, setNoiseSelector } from "./contentDetection";
 import { splitIntoSentences, humanizeText, replaceUrlsWithTitles } from "./textProcessing";
 import { HighlightManager } from "./highlighting";
 import { ElementPicker } from "./elementPicker";
@@ -395,9 +395,22 @@ function noiseMatchCountCallback(selector: string): number {
   return elementPicker.countNoiseMatches(selector, sitePrefs.contentSelector);
 }
 
+// Resolve the content area element from the saved selector or heuristic detection
+function resolveContentRoot(): Element | undefined {
+  if (sitePrefs.contentSelector) {
+    try {
+      const matches = document.querySelectorAll(sitePrefs.contentSelector);
+      if (matches.length === 1) {
+        return matches[0];
+      }
+    } catch { /* invalid selector */ }
+  }
+  return detectContentElement() || undefined;
+}
+
 // Text rule overlay callbacks
 function handleRulePreviewCallback(pattern: string, flags: string, replacement: string) {
-  textRuleOverlay.showRulePreview(pattern, flags, replacement);
+  textRuleOverlay.showRulePreview(pattern, flags, replacement, resolveContentRoot());
 }
 
 function handleRulePreviewHideCallback() {
@@ -428,7 +441,8 @@ function handlePickTextRuleCallback() {
 function ruleMatchCountCallback(pattern: string, flags: string): number {
   try {
     const regex = new RegExp(pattern, flags || "gi");
-    const text = document.body.textContent || "";
+    const root = resolveContentRoot();
+    const text = (root || document.body).textContent || "";
     const matches = text.match(regex);
     return matches ? matches.length : 0;
   } catch {
@@ -445,6 +459,17 @@ function createShadowContainer(id: string): { container: HTMLDivElement; shadow:
   document.body.appendChild(container);
 
   const shadow = container.attachShadow({ mode: "open" });
+
+  // Prevent keyboard events from leaking to the host page when the user is
+  // typing inside our inputs. Without this, pages with their own keyboard
+  // shortcuts (Gmail, YouTube, GitHub, etc.) would intercept keystrokes.
+  shadow.addEventListener("keydown", (e) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" || target.isContentEditable) {
+      e.stopPropagation();
+    }
+  });
 
   const style = document.createElement("style");
   style.textContent = SHADOW_STYLES;
