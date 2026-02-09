@@ -109,10 +109,109 @@ describe("extractTextFromContainer", () => {
     expect(text).toContain("Quote");
   });
 
-  it("returns empty string for container with no block elements", () => {
+  it("extracts text from inline-only containers via fallback", () => {
     document.body.innerHTML = `<div id="container"><span>Inline only</span></div>`;
     const container = document.getElementById("container")!;
-    expect(extractTextFromContainer(container)).toBe("");
+    expect(extractTextFromContainer(container)).toBe("Inline only");
+  });
+
+  it("falls back to direct children when block selectors miss most text (Notion-like DOM)", () => {
+    // Notion wraps text in nested divs, not <p> tags
+    document.body.innerHTML = `
+      <div id="container">
+        <div class="text-block"><div><div>First paragraph of content here.</div></div></div>
+        <div class="text-block"><div><div>Second paragraph with more text.</div></div></div>
+        <div class="text-block"><div><div>Third paragraph to read aloud.</div></div></div>
+      </div>
+    `;
+    const container = document.getElementById("container")!;
+    const text = extractTextFromContainer(container);
+    expect(text).toContain("First paragraph of content here.");
+    expect(text).toContain("Second paragraph with more text.");
+    expect(text).toContain("Third paragraph to read aloud.");
+  });
+
+  it("drills through wrapper divs to find content container", () => {
+    // Simulates Notion's <main> → wrapper → wrapper → .page-content structure
+    document.body.innerHTML = `
+      <div id="outer-wrapper">
+        <div class="inner-wrapper">
+          <div class="page-content">
+            <div>Block one text content.</div>
+            <div>Block two text content.</div>
+            <div>Block three text content.</div>
+          </div>
+        </div>
+      </div>
+    `;
+    const container = document.getElementById("outer-wrapper")!;
+    const text = extractTextFromContainer(container);
+    expect(text).toBe(
+      "Block one text content.\nBlock two text content.\nBlock three text content."
+    );
+  });
+
+  it("stops drilling when children split text evenly", () => {
+    // No single child dominates — should collect from this level
+    document.body.innerHTML = `
+      <div id="container">
+        <div>Alpha block text here.</div>
+        <div>Bravo block text here.</div>
+        <div>Charlie block text here.</div>
+      </div>
+    `;
+    const container = document.getElementById("container")!;
+    const text = extractTextFromContainer(container);
+    expect(text).toBe(
+      "Alpha block text here.\nBravo block text here.\nCharlie block text here."
+    );
+  });
+
+  it("prefers block selectors when they capture most text", () => {
+    document.body.innerHTML = `
+      <div id="container">
+        <p>This paragraph has all the important content that we want to read.</p>
+        <p>And this second paragraph completes the article nicely.</p>
+      </div>
+    `;
+    const container = document.getElementById("container")!;
+    const text = extractTextFromContainer(container);
+    // Should use block selector path, result is newline-joined paragraphs
+    expect(text).toBe(
+      "This paragraph has all the important content that we want to read.\n" +
+      "And this second paragraph completes the article nicely."
+    );
+  });
+
+  it("skips noise children in fallback path", () => {
+    document.body.innerHTML = `
+      <div id="container">
+        <div>Actual content to read aloud.</div>
+        <nav><div>Navigation link text here.</div></nav>
+        <div>More actual content here.</div>
+      </div>
+    `;
+    const container = document.getElementById("container")!;
+    const text = extractTextFromContainer(container);
+    expect(text).toContain("Actual content to read aloud.");
+    expect(text).toContain("More actual content here.");
+    expect(text).not.toContain("Navigation link text");
+  });
+
+  it("handles mixed block and non-block content with headers only matching", () => {
+    // Headers match BLOCK_SELECTOR but body text is in divs — simulates Notion
+    document.body.innerHTML = `
+      <div id="container">
+        <div class="header-block"><h2>Section Title</h2></div>
+        <div class="text-block"><div><div>Body text that is much longer than the header and makes up most of the content on this page.</div></div></div>
+      </div>
+    `;
+    const container = document.getElementById("container")!;
+    const text = extractTextFromContainer(container);
+    // Block selectors only find "Section Title" (13 chars), way under 50% of total
+    // Fallback should get both header and body
+    expect(text).toContain("Section Title");
+    expect(text).toContain("Body text that is much longer");
   });
 });
 
@@ -166,5 +265,18 @@ describe("detectMainContent", () => {
     const text = detectMainContent();
     expect(text).toContain("main content");
     expect(text).not.toContain("navigation text");
+  });
+
+  it("does not filter paragraphs when noise element is outside body (bounded walk)", () => {
+    // Simulates a page where <body> is wrapped in a noise-like structure,
+    // but paragraphs inside body should still be found because the walk
+    // stops at document.body
+    document.body.innerHTML = `
+      <div>
+        <p>This paragraph should be found even though body might have noise ancestors outside.</p>
+      </div>
+    `;
+    const text = detectMainContent();
+    expect(text).toContain("paragraph should be found");
   });
 });

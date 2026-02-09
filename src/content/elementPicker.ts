@@ -2,6 +2,7 @@
 // All state is encapsulated in an ElementPicker instance.
 
 import { detectContentElement } from "./contentDetection";
+import { findScrollContainer, getScrollOffset } from "./highlighting";
 
 export class ElementPicker {
   private active = false;
@@ -130,13 +131,17 @@ export class ElementPicker {
     const color = isUnique ? "rgba(96,165,250,0.9)" : "rgba(239,68,68,0.9)";
     const bg = isUnique ? "rgba(96,165,250,0.06)" : "rgba(239,68,68,0.06)";
 
+    const scroller = findScrollContainer(matches[0]);
+    const offset = getScrollOffset(scroller);
+    const overlayParent = scroller ?? document.documentElement;
+
     const rect = matches[0].getBoundingClientRect();
     this.previewHighlight = document.createElement("div");
     this.previewHighlight.style.cssText = `
       position: absolute; pointer-events: none; z-index: 2147483645;
       border: 2px solid ${color}; background: ${bg};
       border-radius: 4px;
-      left: ${rect.left + window.scrollX}px; top: ${rect.top + window.scrollY}px;
+      left: ${rect.left - offset.offsetLeft + offset.scrollLeft}px; top: ${rect.top - offset.offsetTop + offset.scrollTop}px;
       width: ${rect.width}px; height: ${rect.height}px;
     `;
 
@@ -149,15 +154,15 @@ export class ElementPicker {
           position: absolute; pointer-events: none; z-index: 2147483645;
           border: 2px dashed rgba(239,68,68,0.6);
           border-radius: 4px;
-          left: ${r.left + window.scrollX}px; top: ${r.top + window.scrollY}px;
+          left: ${r.left - offset.offsetLeft + offset.scrollLeft}px; top: ${r.top - offset.offsetTop + offset.scrollTop}px;
           width: ${r.width}px; height: ${r.height}px;
         `;
-        document.documentElement.appendChild(extra);
+        overlayParent.appendChild(extra);
         this.previewExtras.push(extra);
       }
     }
 
-    document.documentElement.appendChild(this.previewHighlight);
+    overlayParent.appendChild(this.previewHighlight);
   }
 
   /** Hide the selector preview outline. */
@@ -190,6 +195,10 @@ export class ElementPicker {
       boundary = detectContentElement();
     }
 
+    const scroller = boundary ? findScrollContainer(boundary) : null;
+    const offset = getScrollOffset(scroller);
+    const overlayParent = scroller ?? document.documentElement;
+
     if (boundary) {
       const bRect = boundary.getBoundingClientRect();
       this.contentAreaHighlight = document.createElement("div");
@@ -197,7 +206,7 @@ export class ElementPicker {
         position: absolute; pointer-events: none; z-index: 2147483644;
         border: 2px dashed #a855f7; background: rgba(168,85,247,0.04);
         border-radius: 4px;
-        left: ${bRect.left + window.scrollX}px; top: ${bRect.top + window.scrollY}px;
+        left: ${bRect.left - offset.offsetLeft + offset.scrollLeft}px; top: ${bRect.top - offset.offsetTop + offset.scrollTop}px;
         width: ${bRect.width}px; height: ${bRect.height}px;
       `;
       const label = document.createElement("div");
@@ -209,7 +218,7 @@ export class ElementPicker {
       `;
       label.textContent = "Content area";
       this.contentAreaHighlight.appendChild(label);
-      document.documentElement.appendChild(this.contentAreaHighlight);
+      overlayParent.appendChild(this.contentAreaHighlight);
     }
 
     // Highlight noise elements
@@ -230,10 +239,10 @@ export class ElementPicker {
         position: absolute; pointer-events: none; z-index: 2147483645;
         border: 2px solid rgba(239,68,68,0.7); background: rgba(239,68,68,0.08);
         border-radius: 4px;
-        left: ${rect.left + window.scrollX}px; top: ${rect.top + window.scrollY}px;
+        left: ${rect.left - offset.offsetLeft + offset.scrollLeft}px; top: ${rect.top - offset.offsetTop + offset.scrollTop}px;
         width: ${rect.width}px; height: ${rect.height}px;
       `;
-      document.documentElement.appendChild(box);
+      overlayParent.appendChild(box);
       this.noisePreviewHighlights.push(box);
     }
   }

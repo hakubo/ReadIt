@@ -272,7 +272,7 @@ export function FloatingPlayer({
           <span className={`pill-total-time${loading ? " pill-total-loading" : ""}`}>
             {loading && totalEstimatedDuration === 0
               ? "--:--"
-              : (loading || !hasAudio ? "~" : "") + formatTime(totalEstimatedDuration / speed)}
+              : (loading || !hasAudio || (!isActive && totalEstimatedDuration === 0) ? "~" : "") + formatTime(totalEstimatedDuration / speed)}
           </span>
         </div>
 

@@ -1,7 +1,7 @@
 // Sentence highlighting: overlay creation, rect computation, highlight boxes, and auto-scroll.
 // All state is encapsulated in a HighlightManager instance.
 
-import { NOISE_SELECTOR } from "./contentDetection";
+import { hasNoiseAncestor } from "./contentDetection";
 
 export interface HighlightState {
   sentences: string[];
@@ -9,13 +9,62 @@ export interface HighlightState {
   currentHighlightIndex: number;
 }
 
+export interface ScrollOffset {
+  scrollLeft: number;
+  scrollTop: number;
+  offsetLeft: number;
+  offsetTop: number;
+}
+
+/**
+ * Walk up from an element to find the first scrollable ancestor.
+ * Returns null if the page uses window-level scrolling.
+ */
+export function findScrollContainer(startEl: Element): Element | null {
+  let el: Element | null = startEl.parentElement;
+  while (el && el !== document.documentElement) {
+    const style = getComputedStyle(el);
+    const overflowY = style.overflowY;
+    if (
+      (overflowY === "auto" || overflowY === "scroll") &&
+      el.scrollHeight > el.clientHeight + 1
+    ) {
+      return el;
+    }
+    el = el.parentElement;
+  }
+  return null;
+}
+
+/**
+ * Get scroll offsets for converting viewport coords to content-space coords.
+ * When container is null (window scrolling), returns window.scrollX/Y with zero offsets.
+ */
+export function getScrollOffset(container: Element | null): ScrollOffset {
+  if (!container) {
+    return {
+      scrollLeft: window.scrollX,
+      scrollTop: window.scrollY,
+      offsetLeft: 0,
+      offsetTop: 0,
+    };
+  }
+  const rect = container.getBoundingClientRect();
+  return {
+    scrollLeft: container.scrollLeft,
+    scrollTop: container.scrollTop,
+    offsetLeft: rect.left,
+    offsetTop: rect.top,
+  };
+}
+
 export class HighlightManager {
   private highlightOverlay: HTMLDivElement | null = null;
   private currentHighlightBoxes: HTMLDivElement[] = [];
-  private highlightScrollHandler: (() => void) | null = null;
   private highlightResizeHandler: (() => void) | null = null;
   private resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private highlightStyleEl: HTMLStyleElement | null = null;
+  private scrollContainer: Element | null = null;
 
   sentences: string[] = [];
   sentenceRectsCache: DOMRect[][] = [];
@@ -24,20 +73,20 @@ export class HighlightManager {
   autoScrollEnabled = true;
   highlightColor = "rgba(254, 240, 138, 0.55)";
 
-  /** Create the fixed overlay and attach scroll/resize handlers. */
+  /** Create the absolute overlay and attach resize handler. */
   createHighlightOverlay(): void {
     this.highlightOverlay = document.createElement("div");
     this.highlightOverlay.id = "unmute-highlight-overlay";
     this.highlightOverlay.style.cssText = `
-      position: fixed;
+      position: absolute;
       top: 0;
       left: 0;
-      width: 100vw;
-      height: 100vh;
+      width: 100%;
+      height: 100%;
       pointer-events: none;
       z-index: 10000;
     `;
-    document.documentElement.appendChild(this.highlightOverlay);
+    (this.scrollContainer ?? document.documentElement).appendChild(this.highlightOverlay);
 
     // Inject keyframe for pulse animation into the main document
     this.highlightStyleEl = document.createElement("style");
@@ -48,9 +97,6 @@ export class HighlightManager {
       }
     `;
     document.head.appendChild(this.highlightStyleEl);
-
-    this.highlightScrollHandler = () => this.repositionHighlightBoxes();
-    window.addEventListener("scroll", this.highlightScrollHandler, { passive: true });
 
     this.highlightResizeHandler = () => {
       if (this.resizeDebounceTimer) {clearTimeout(this.resizeDebounceTimer);}
@@ -110,12 +156,15 @@ export class HighlightManager {
 
     const savedX = window.scrollX;
     const savedY = window.scrollY;
+    const savedContainerX = this.scrollContainer?.scrollLeft ?? 0;
+    const savedContainerY = this.scrollContainer?.scrollTop ?? 0;
 
     selection.removeAllRanges();
 
     const windowFind = (window as unknown as { find: (str: string, caseSensitive?: boolean, backwards?: boolean, wrapAround?: boolean, wholeWord?: boolean, searchInFrames?: boolean, showDialog?: boolean) => boolean }).find;
 
     this.sentenceRectsCache = [];
+    let scrollContainerDetected = false;
 
     for (let s = 0; s < this.sentences.length; s++) {
       let rects: DOMRect[] = [];
@@ -130,14 +179,22 @@ export class HighlightManager {
           ? container as Element
           : container.parentElement;
 
-        if (el && el.closest(NOISE_SELECTOR)) {
+        // Detect scroll container from the first matched sentence
+        if (!scrollContainerDetected && el) {
+          this.scrollContainer = findScrollContainer(el);
+          scrollContainerDetected = true;
+        }
+
+        const boundary = this.scrollContainer ?? document.documentElement;
+        if (el && hasNoiseAncestor(el, boundary)) {
           continue;
         }
 
+        const offset = getScrollOffset(this.scrollContainer);
         const clientRects = this.mergeRects(range.getClientRects());
         rects = clientRects.map(r => new DOMRect(
-          r.left + window.scrollX,
-          r.top + window.scrollY,
+          r.left - offset.offsetLeft + offset.scrollLeft,
+          r.top - offset.offsetTop + offset.scrollTop,
           r.width,
           r.height
         ));
@@ -147,14 +204,14 @@ export class HighlightManager {
       this.sentenceRectsCache.push(rects);
     }
 
+    if (this.scrollContainer) {
+      this.scrollContainer.scrollTo(savedContainerX, savedContainerY);
+    }
     window.scrollTo(savedX, savedY);
     selection.removeAllRanges();
   }
 
-  /**
-   * Apply highlight boxes for a sentence from cached absolute coords,
-   * converting to viewport-relative coords for the fixed overlay.
-   */
+  /** Apply highlight boxes for a sentence using cached absolute document coords. */
   applyHighlightForSentence(index: number): void {
     if (!this.highlightOverlay) {return;}
 
@@ -165,15 +222,12 @@ export class HighlightManager {
     const rects = this.sentenceRectsCache[index];
     if (!rects) {return;}
 
-    const sx = window.scrollX;
-    const sy = window.scrollY;
-
     for (const r of rects) {
       const box = document.createElement("div");
       box.style.cssText = `
         position: absolute;
-        left: ${r.x - sx}px;
-        top: ${r.y - sy}px;
+        left: ${r.x}px;
+        top: ${r.y}px;
         width: ${r.width}px;
         height: ${r.height}px;
         background-color: ${this.highlightColor};
@@ -182,21 +236,6 @@ export class HighlightManager {
       `;
       this.highlightOverlay.appendChild(box);
       this.currentHighlightBoxes.push(box);
-    }
-  }
-
-  /** Reposition existing highlight boxes on scroll. */
-  private repositionHighlightBoxes(): void {
-    if (this.currentHighlightIndex < 0) {return;}
-    const rects = this.sentenceRectsCache[this.currentHighlightIndex];
-    if (!rects || rects.length !== this.currentHighlightBoxes.length) {return;}
-
-    const sx = window.scrollX;
-    const sy = window.scrollY;
-
-    for (let i = 0; i < rects.length; i++) {
-      this.currentHighlightBoxes[i].style.left = `${rects[i].x - sx}px`;
-      this.currentHighlightBoxes[i].style.top = `${rects[i].y - sy}px`;
     }
   }
 
@@ -212,14 +251,25 @@ export class HighlightManager {
     if (this.autoScrollEnabled && rects && rects.length > 0) {
       const absY = rects[0].y;
       const absBottom = rects[0].y + rects[0].height;
-      const viewportTop = window.scrollY;
-      const viewportBottom = viewportTop + window.innerHeight;
 
-      if (absBottom > viewportBottom) {
-        window.scrollTo({
-          top: absY - window.innerHeight / 3,
-          behavior: "smooth",
-        });
+      if (this.scrollContainer) {
+        const viewportTop = this.scrollContainer.scrollTop;
+        const viewportBottom = viewportTop + this.scrollContainer.clientHeight;
+        if (absBottom > viewportBottom) {
+          this.scrollContainer.scrollTo({
+            top: absY - this.scrollContainer.clientHeight / 3,
+            behavior: "smooth",
+          });
+        }
+      } else {
+        const viewportTop = window.scrollY;
+        const viewportBottom = viewportTop + window.innerHeight;
+        if (absBottom > viewportBottom) {
+          window.scrollTo({
+            top: absY - window.innerHeight / 3,
+            behavior: "smooth",
+          });
+        }
       }
     }
   }
@@ -235,15 +285,12 @@ export class HighlightManager {
     this.currentHighlightBoxes = [];
     this.currentHighlightIndex = index;
 
-    const sx = window.scrollX;
-    const sy = window.scrollY;
-
     for (const r of rects) {
       const box = document.createElement("div");
       box.style.cssText = `
         position: absolute;
-        left: ${r.x - sx}px;
-        top: ${r.y - sy}px;
+        left: ${r.x}px;
+        top: ${r.y}px;
         width: ${r.width}px;
         height: ${r.height}px;
         background-color: ${this.highlightColor};
@@ -260,8 +307,9 @@ export class HighlightManager {
   getSentenceIndexAtPoint(clientX: number, clientY: number): number {
     if (this.sentenceRectsCache.length === 0) {return -1;}
 
-    const pageX = clientX + window.scrollX;
-    const pageY = clientY + window.scrollY;
+    const offset = getScrollOffset(this.scrollContainer);
+    const pageX = clientX - offset.offsetLeft + offset.scrollLeft;
+    const pageY = clientY - offset.offsetTop + offset.scrollTop;
 
     for (let i = 0; i < this.sentenceRectsCache.length; i++) {
       const rects = this.sentenceRectsCache[i];
@@ -284,10 +332,6 @@ export class HighlightManager {
 
   /** Clean up all highlighting state and DOM elements. */
   cleanup(): void {
-    if (this.highlightScrollHandler) {
-      window.removeEventListener("scroll", this.highlightScrollHandler);
-      this.highlightScrollHandler = null;
-    }
     if (this.highlightResizeHandler) {
       window.removeEventListener("resize", this.highlightResizeHandler);
       this.highlightResizeHandler = null;
@@ -308,5 +352,6 @@ export class HighlightManager {
     this.sentenceRectsCache = [];
     this.currentHighlightIndex = -1;
     this.sentences = [];
+    this.scrollContainer = null;
   }
 }
