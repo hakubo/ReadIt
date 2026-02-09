@@ -23,6 +23,10 @@ const defaultProps = {
   onSetContentSelector: vi.fn(),
   onSelectorFocus: vi.fn(),
   onSelectorBlur: vi.fn(),
+  onNoisePreview: vi.fn(),
+  onNoisePreviewHide: vi.fn(),
+  onPickNoise: vi.fn(),
+  noiseMatchCount: vi.fn().mockReturnValue(0),
 };
 
 function resetStore(overrides: Record<string, unknown> = {}) {

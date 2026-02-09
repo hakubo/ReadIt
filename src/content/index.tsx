@@ -1,11 +1,11 @@
 import { createRoot, Root } from "react-dom/client";
 import { SelectionButton } from "./SelectionButton";
 import { FloatingPlayer, type PlayerState } from "./FloatingPlayer";
-import { type TTSSettings, type SitePrefs } from "@/shared/types";
+import { type TTSSettings, type SitePrefs, DEFAULT_NOISE_SELECTORS } from "@/shared/types";
 import { getEffectiveSettings, getDomainSettings, saveGlobalSettings, saveDomainSettings } from "@/shared/settings";
 import { setPlaybackState } from "./playerStore";
 import { SHADOW_STYLES } from "./styles";
-import { detectMainContent } from "./contentDetection";
+import { detectMainContent, setNoiseSelector } from "./contentDetection";
 import { splitIntoSentences, humanizeText, replaceUrlsWithTitles } from "./textProcessing";
 import { HighlightManager } from "./highlighting";
 import { ElementPicker } from "./elementPicker";
@@ -355,6 +355,44 @@ function handleSelectorBlurCallback() {
   elementPicker.hideSelectorPreview();
 }
 
+// Noise selector preview & picker callbacks
+function handleNoisePreviewCallback(selector: string) {
+  elementPicker.showNoisePreview(selector, sitePrefs.contentSelector);
+}
+
+function handleNoisePreviewHideCallback() {
+  elementPicker.hideNoisePreview();
+}
+
+function handlePickNoiseCallback() {
+  elementPicker.start(
+    (selector) => {
+      void (async () => {
+        const settings = await getSettings();
+        const current = settings.noiseSelectors ?? [];
+        if (!current.includes(selector)) {
+          const updated = [...current, selector];
+          settings.noiseSelectors = updated;
+          setNoiseSelector(updated);
+          const domainSettings = await getDomainSettings(currentDomain);
+          if (domainSettings) {
+            await saveDomainSettings(currentDomain, { ...settings });
+          } else {
+            await saveGlobalSettings({ ...settings });
+          }
+        }
+      })();
+    },
+    () => {
+      // cancelled — no action needed
+    },
+  );
+}
+
+function noiseMatchCountCallback(selector: string): number {
+  return elementPicker.countNoiseMatches(selector, sitePrefs.contentSelector);
+}
+
 // ---------------------------------------------------------------------------
 // Shadow DOM helpers
 // ---------------------------------------------------------------------------
@@ -438,6 +476,10 @@ function showPlayer() {
         onSetContentSelector={handleSetContentSelectorCallback}
         onSelectorFocus={handleSelectorFocusCallback}
         onSelectorBlur={handleSelectorBlurCallback}
+        onNoisePreview={handleNoisePreviewCallback}
+        onNoisePreviewHide={handleNoisePreviewHideCallback}
+        onPickNoise={handlePickNoiseCallback}
+        noiseMatchCount={noiseMatchCountCallback}
       />
     );
   }
@@ -604,6 +646,9 @@ function applySettingsChange(newSettings: TTSSettings) {
   if (newSettings.theme && newSettings.theme !== currentTheme) {
     currentTheme = newSettings.theme;
     updatePlayer();
+  }
+  if (newSettings.noiseSelectors) {
+    setNoiseSelector(newSettings.noiseSelectors);
   }
 }
 
@@ -908,6 +953,7 @@ async function init() {
   currentTheme = settings.theme || "dark";
   currentSpeed = settings.speed;
   audioEngine.setCurrentSpeed(settings.speed);
+  setNoiseSelector(settings.noiseSelectors ?? DEFAULT_NOISE_SELECTORS);
 
   const result = await chrome.storage.local.get(SITE_KEY);
   sitePrefs = result[SITE_KEY] || {};

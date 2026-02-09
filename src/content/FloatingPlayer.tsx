@@ -27,6 +27,10 @@ interface FloatingPlayerProps {
   onSetContentSelector: (selector: string) => void;
   onSelectorFocus: () => void;
   onSelectorBlur: () => void;
+  onNoisePreview: (selector: string) => void;
+  onNoisePreviewHide: () => void;
+  onPickNoise: () => void;
+  noiseMatchCount: (selector: string) => number;
 }
 
 const SPEED_OPTIONS = [0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2];
@@ -61,6 +65,10 @@ export function FloatingPlayer({
   onSetContentSelector,
   onSelectorFocus,
   onSelectorBlur,
+  onNoisePreview,
+  onNoisePreviewHide,
+  onPickNoise,
+  noiseMatchCount,
 }: FloatingPlayerProps) {
   // Subscribe to the external playback store — re-renders only when snapshot changes
   const {
@@ -195,6 +203,7 @@ export function FloatingPlayer({
   const handleSettingsClose = () => setSettingsOpen(false);
   const handleSettingsToggle = () => setSettingsOpen(!settingsOpen);
   const handlePickContent = () => { setSettingsOpen(false); onPickContent(); };
+  const handlePickNoise = () => { setSettingsOpen(false); onPickNoise(); };
 
   return (
     <>
@@ -313,6 +322,10 @@ export function FloatingPlayer({
         onSetContentSelector={onSetContentSelector}
         onSelectorFocus={onSelectorFocus}
         onSelectorBlur={onSelectorBlur}
+        onNoisePreview={onNoisePreview}
+        onNoisePreviewHide={onNoisePreviewHide}
+        onPickNoise={handlePickNoise}
+        noiseMatchCount={noiseMatchCount}
       />
     </>
   );

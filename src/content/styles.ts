@@ -808,6 +808,122 @@ export const SHADOW_STYLES = `
     color: #374151;
   }
 
+  .settings-noise-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-height: 140px;
+    overflow-y: auto;
+    margin-top: 6px;
+    padding-right: 2px;
+  }
+  .settings-noise-pills::-webkit-scrollbar {
+    width: 4px;
+  }
+  .settings-noise-pills::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+  }
+  .settings-noise-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+    padding: 2px 6px 2px 8px;
+    font-size: 10px;
+    font-family: ui-monospace, monospace;
+    color: #e5e7eb;
+    line-height: 1.4;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+  .settings-noise-pill:hover {
+    border-color: rgba(96, 165, 250, 0.5);
+  }
+  .settings-noise-pill.active {
+    border-color: rgba(96, 165, 250, 0.8);
+    background: rgba(96, 165, 250, 0.12);
+  }
+  .settings-panel.theme-light .settings-noise-pill {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.12);
+    color: #374151;
+  }
+  .settings-panel.theme-light .settings-noise-pill:hover {
+    border-color: rgba(96, 165, 250, 0.5);
+  }
+  .settings-panel.theme-light .settings-noise-pill.active {
+    border-color: rgba(96, 165, 250, 0.8);
+    background: rgba(96, 165, 250, 0.08);
+  }
+  .noise-pill-text {
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .noise-pill-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 0;
+    font-size: 11px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .noise-pill-remove:hover {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.15);
+  }
+  .settings-panel.theme-light .noise-pill-remove:hover {
+    color: #dc2626;
+    background: rgba(220, 38, 38, 0.1);
+  }
+  .settings-noise-add {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .settings-noise-add-btn {
+    padding: 3px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    background: none;
+    color: #9ca3af;
+    font-size: 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .settings-noise-add-btn:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #d1d5db;
+  }
+  .settings-panel.theme-light .settings-noise-add-btn {
+    border-color: rgba(0, 0, 0, 0.15);
+    color: #6b7280;
+  }
+  .settings-panel.theme-light .settings-noise-add-btn:hover {
+    border-color: rgba(0, 0, 0, 0.3);
+    color: #374151;
+  }
+  .noise-match-count {
+    font-size: 9px;
+    color: #6b7280;
+    margin-left: 2px;
+  }
+  .noise-match-count.has-matches {
+    color: #60a5fa;
+  }
+
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }

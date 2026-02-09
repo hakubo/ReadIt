@@ -13,6 +13,7 @@ export class ElementPicker {
 
   // Selector preview state (shown when settings input is focused)
   private previewHighlight: HTMLDivElement | null = null;
+  private previewExtras: HTMLDivElement[] = [];
 
   isActive(): boolean {
     return this.active;
@@ -132,10 +133,10 @@ export class ElementPicker {
     const rect = matches[0].getBoundingClientRect();
     this.previewHighlight = document.createElement("div");
     this.previewHighlight.style.cssText = `
-      position: fixed; pointer-events: none; z-index: 2147483645;
+      position: absolute; pointer-events: none; z-index: 2147483645;
       border: 2px solid ${color}; background: ${bg};
       border-radius: 4px;
-      left: ${rect.left}px; top: ${rect.top}px;
+      left: ${rect.left + window.scrollX}px; top: ${rect.top + window.scrollY}px;
       width: ${rect.width}px; height: ${rect.height}px;
     `;
 
@@ -145,13 +146,14 @@ export class ElementPicker {
         const extra = document.createElement("div");
         extra.className = "selector-preview-extra";
         extra.style.cssText = `
-          position: fixed; pointer-events: none; z-index: 2147483645;
+          position: absolute; pointer-events: none; z-index: 2147483645;
           border: 2px dashed rgba(239,68,68,0.6);
           border-radius: 4px;
-          left: ${r.left}px; top: ${r.top}px;
+          left: ${r.left + window.scrollX}px; top: ${r.top + window.scrollY}px;
           width: ${r.width}px; height: ${r.height}px;
         `;
-        this.previewHighlight.appendChild(extra);
+        document.documentElement.appendChild(extra);
+        this.previewExtras.push(extra);
       }
     }
 
@@ -164,6 +166,106 @@ export class ElementPicker {
       this.previewHighlight.remove();
       this.previewHighlight = null;
     }
+    for (const h of this.previewExtras) {h.remove();}
+    this.previewExtras = [];
+  }
+
+  // Noise selector preview state
+  private noisePreviewHighlights: HTMLDivElement[] = [];
+  private contentAreaHighlight: HTMLDivElement | null = null;
+
+  /** Show preview highlights for noise selector matches, optionally scoped to a content area. */
+  showNoisePreview(selector: string, contentArea?: string): void {
+    this.hideNoisePreview();
+
+    // Show content area boundary
+    let boundary: Element | null = null;
+    if (contentArea) {
+      try {
+        const matches = document.querySelectorAll(contentArea);
+        if (matches.length === 1) {boundary = matches[0];}
+      } catch { /* invalid selector */ }
+    }
+    if (!boundary) {
+      boundary = detectContentElement();
+    }
+
+    if (boundary) {
+      const bRect = boundary.getBoundingClientRect();
+      this.contentAreaHighlight = document.createElement("div");
+      this.contentAreaHighlight.style.cssText = `
+        position: absolute; pointer-events: none; z-index: 2147483644;
+        border: 2px dashed #a855f7; background: rgba(168,85,247,0.04);
+        border-radius: 4px;
+        left: ${bRect.left + window.scrollX}px; top: ${bRect.top + window.scrollY}px;
+        width: ${bRect.width}px; height: ${bRect.height}px;
+      `;
+      const label = document.createElement("div");
+      label.style.cssText = `
+        position: absolute; top: 4px; left: 4px;
+        background: rgba(168,85,247,0.85); color: white; font-size: 10px;
+        font-family: system-ui, sans-serif; padding: 2px 6px;
+        border-radius: 3px; white-space: nowrap;
+      `;
+      label.textContent = "Content area";
+      this.contentAreaHighlight.appendChild(label);
+      document.documentElement.appendChild(this.contentAreaHighlight);
+    }
+
+    // Highlight noise elements
+    let matches: Element[];
+    try {
+      if (boundary) {
+        matches = Array.from(boundary.querySelectorAll(selector));
+      } else {
+        matches = Array.from(document.querySelectorAll(selector));
+      }
+    } catch { return; }
+
+    for (const el of matches) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) {continue;}
+      const box = document.createElement("div");
+      box.style.cssText = `
+        position: absolute; pointer-events: none; z-index: 2147483645;
+        border: 2px solid rgba(239,68,68,0.7); background: rgba(239,68,68,0.08);
+        border-radius: 4px;
+        left: ${rect.left + window.scrollX}px; top: ${rect.top + window.scrollY}px;
+        width: ${rect.width}px; height: ${rect.height}px;
+      `;
+      document.documentElement.appendChild(box);
+      this.noisePreviewHighlights.push(box);
+    }
+  }
+
+  /** Hide noise selector preview highlights. */
+  hideNoisePreview(): void {
+    for (const h of this.noisePreviewHighlights) {h.remove();}
+    this.noisePreviewHighlights = [];
+    if (this.contentAreaHighlight) {
+      this.contentAreaHighlight.remove();
+      this.contentAreaHighlight = null;
+    }
+  }
+
+  /** Count how many elements match a noise selector, optionally within a content area. */
+  countNoiseMatches(selector: string, contentArea?: string): number {
+    let boundary: Element | null = null;
+    if (contentArea) {
+      try {
+        const matches = document.querySelectorAll(contentArea);
+        if (matches.length === 1) {boundary = matches[0];}
+      } catch { /* invalid selector */ }
+    }
+    if (!boundary) {
+      boundary = detectContentElement();
+    }
+    try {
+      if (boundary) {
+        return boundary.querySelectorAll(selector).length;
+      }
+      return document.querySelectorAll(selector).length;
+    } catch { return 0; }
   }
 
   /**
@@ -354,5 +456,6 @@ export class ElementPicker {
     this.extraHighlights = [];
     if (this.autoDetectHighlight) { this.autoDetectHighlight.remove(); this.autoDetectHighlight = null; }
     if (this.tooltip) { this.tooltip.remove(); this.tooltip = null; }
+    this.hideNoisePreview();
   }
 }

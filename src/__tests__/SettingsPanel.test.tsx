@@ -53,12 +53,15 @@ describe("SettingsPanel", () => {
     vi.clearAllMocks();
     // Reset chrome mock responses
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(
-      (_msg: unknown, callback?: (response: unknown) => void) => {
+      ((...args: unknown[]) => {
+        const callback = args.find((a) => typeof a === "function") as
+          | ((response: unknown) => void)
+          | undefined;
         if (callback) {
           callback({ modelCached: true, cachedVoices: [] });
         }
         return undefined as never;
-      },
+      }) as typeof chrome.runtime.sendMessage,
     );
   });
 
