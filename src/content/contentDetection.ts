@@ -30,7 +30,7 @@ export function extractTextFromContainer(container: Element): string {
   for (const block of blocks) {
     if (hasNoiseAncestor(block, container)) {continue;}
     if (block.querySelector(BLOCK_SELECTOR)) {continue;}
-    const t = (block.textContent || "").trim();
+    const t = (block.textContent || "").trim().replace(/\s+/g, " ");
     if (t.length > 0) {texts.push(t);}
   }
   const blockText = texts.join("\n");
@@ -47,7 +47,7 @@ export function extractTextFromContainer(container: Element): string {
   for (const child of contentEl.children) {
     if (child instanceof HTMLElement && child.matches(NOISE_SELECTOR)) {continue;}
     if (child instanceof HTMLElement && hasNoiseAncestor(child, contentEl)) {continue;}
-    const t = (child.textContent || "").trim();
+    const t = (child.textContent || "").trim().replace(/\s+/g, " ");
     if (t.length > 0) {childTexts.push(t);}
   }
 
@@ -195,7 +195,7 @@ export function detectMainContent(contentSelector?: string): string | null {
   // Last resort: all <p> tags on the page
   const paragraphs = Array.from(document.querySelectorAll("p"))
     .filter((p) => !hasNoiseAncestor(p, document.body))
-    .map((p) => (p.textContent || "").trim())
+    .map((p) => (p.textContent || "").trim().replace(/\s+/g, " "))
     .filter((t) => t.length > 20);
   if (paragraphs.length > 0) {
     return paragraphs.join("\n");
