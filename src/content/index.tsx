@@ -315,6 +315,11 @@ function handlePlayCallback() {
       handleRead();
       return;
     }
+    // No content found — open settings panel to guide user
+    console.warn("[unmute.page] No readable content detected. Opening settings.");
+    openSettingsRequested = true;
+    updatePlayer();
+    return;
   }
   audioEngine.play();
 }
@@ -556,7 +561,13 @@ async function handleRead() {
 
   // Split raw text into sentences (matches page DOM for window.find highlighting),
   // then process each sentence individually for TTS.
-  highlightManager.sentences = splitIntoSentences(selectedText);
+  highlightManager.sentences = splitIntoSentences(selectedText).filter(s => s.trim().length > 0);
+
+  if (highlightManager.sentences.length === 0) {
+    console.warn("[unmute.page] No sentences to read after splitting text.");
+    return;
+  }
+
   highlightManager.highlightingEnabled = highlightingEnabled;
   highlightManager.autoScrollEnabled = autoScrollEnabled;
   highlightManager.highlightColor = highlightColor;
@@ -946,6 +957,33 @@ function estimatePageDuration() {
   }
 }
 
+function setupContentObserver() {
+  if (totalEstimatedDuration > 0) { return; }
+
+  let attempts = 0;
+  const MAX_ATTEMPTS = 15;
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const observer = new MutationObserver(() => {
+    if (debounceTimer) { clearTimeout(debounceTimer); }
+    debounceTimer = setTimeout(() => {
+      if (isLoading || isStreaming) {
+        observer.disconnect();
+        return;
+      }
+      attempts++;
+      estimatePageDuration();
+      updatePlayer();
+      if (totalEstimatedDuration > 0 || attempts >= MAX_ATTEMPTS) {
+        observer.disconnect();
+      }
+    }, 1000);
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
+  setTimeout(() => observer.disconnect(), 30_000);
+}
+
 async function init() {
   if (document.contentType && !document.contentType.startsWith("text/html")) {return;}
 
@@ -965,15 +1003,7 @@ async function init() {
 
   estimatePageDuration();
   showPlayer();
-
-  if (document.readyState !== "complete") {
-    window.addEventListener("load", () => {
-      if (!isLoading && !isStreaming) {
-        estimatePageDuration();
-        updatePlayer();
-      }
-    }, { once: true });
-  }
+  setupContentObserver();
 }
 
 init();

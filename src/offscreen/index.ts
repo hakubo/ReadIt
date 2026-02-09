@@ -77,6 +77,11 @@ async function handleGenerateTTSStreaming(
   const sentences = preSplitSentences;
   const totalSentences = sentences.length;
 
+  if (totalSentences === 0) {
+    chrome.runtime.sendMessage({ type: "TTS_STREAM_END" });
+    return { success: true, empty: true };
+  }
+
   // Reset state
   abortGeneration = false;
   isGenerating = true;

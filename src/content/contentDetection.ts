@@ -33,7 +33,59 @@ export function extractTextFromContainer(container: Element): string {
     const t = (block.textContent || "").trim();
     if (t.length > 0) {texts.push(t);}
   }
-  return texts.join("\n");
+  const blockText = texts.join("\n");
+
+  // Check if block selectors captured most of the container's readable text.
+  // If not, fall back to collecting text from direct children of the innermost
+  // content container (handles Notion, Google Docs, and other non-semantic DOMs
+  // that wrap text in deeply nested <div> chains instead of <p> tags).
+  const totalLen = scoreContentLength(container);
+  if (totalLen > 0 && blockText.length >= totalLen * 0.5) {return blockText;}
+
+  const contentEl = drillToContentContainer(container);
+  const childTexts: string[] = [];
+  for (const child of contentEl.children) {
+    if (child instanceof HTMLElement && child.matches(NOISE_SELECTOR)) {continue;}
+    if (child instanceof HTMLElement && hasNoiseAncestor(child, contentEl)) {continue;}
+    const t = (child.textContent || "").trim();
+    if (t.length > 0) {childTexts.push(t);}
+  }
+
+  return childTexts.length > 0 ? childTexts.join("\n") : blockText;
+}
+
+/**
+ * Drill through wrapper divs to find the innermost element whose children
+ * are actual content blocks (not a single wrapper). At each level, if one
+ * child holds >80% of the text and has its own children, drill into it.
+ */
+function drillToContentContainer(container: Element, maxDepth = 10): Element {
+  if (maxDepth <= 0) {return container;}
+
+  const children = Array.from(container.children).filter(
+    c => c instanceof HTMLElement && !(c as HTMLElement).matches(NOISE_SELECTOR)
+  );
+  if (children.length === 0) {return container;}
+
+  const containerLen = scoreContentLength(container);
+  if (containerLen === 0) {return container;}
+
+  let bestChild: Element | null = null;
+  let bestLen = 0;
+  for (const child of children) {
+    const len = scoreContentLength(child);
+    if (len > bestLen) {
+      bestLen = len;
+      bestChild = child;
+    }
+  }
+
+  // If one child dominates (>80% of text) and has children to drill into, go deeper
+  if (bestChild && bestLen > containerLen * 0.8 && bestChild.children.length > 0) {
+    return drillToContentContainer(bestChild, maxDepth - 1);
+  }
+
+  return container;
 }
 
 /**
@@ -142,7 +194,7 @@ export function detectMainContent(contentSelector?: string): string | null {
 
   // Last resort: all <p> tags on the page
   const paragraphs = Array.from(document.querySelectorAll("p"))
-    .filter((p) => !p.closest(NOISE_SELECTOR))
+    .filter((p) => !hasNoiseAncestor(p, document.body))
     .map((p) => (p.textContent || "").trim())
     .filter((t) => t.length > 20);
   if (paragraphs.length > 0) {
