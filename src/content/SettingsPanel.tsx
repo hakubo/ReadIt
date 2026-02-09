@@ -44,6 +44,10 @@ interface SettingsPanelProps {
   onNoisePreviewHide?: () => void;
   onPickNoise?: () => void;
   noiseMatchCount?: (selector: string) => number;
+  onRulePreview?: (pattern: string, flags: string, replacement: string) => void;
+  onRulePreviewHide?: () => void;
+  onPickTextRule?: () => void;
+  ruleMatchCount?: (pattern: string, flags: string) => number;
 }
 
 function formatDomain(domain: string): string {
@@ -51,7 +55,7 @@ function formatDomain(domain: string): string {
   return d.length > 28 ? d.slice(0, 26) + "\u2026" : d;
 }
 
-export function SettingsPanel({ position, onClose, domain, theme, visible = true, onPickContent, contentSelector, onClearContentSelector, onSetContentSelector, onSelectorFocus, onSelectorBlur, onNoisePreview, onNoisePreviewHide, onPickNoise, noiseMatchCount }: SettingsPanelProps) {
+export function SettingsPanel({ position, onClose, domain, theme, visible = true, onPickContent, contentSelector, onClearContentSelector, onSetContentSelector, onSelectorFocus, onSelectorBlur, onNoisePreview, onNoisePreviewHide, onPickNoise, noiseMatchCount, onRulePreview, onRulePreviewHide, onPickTextRule, ruleMatchCount }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<"default" | "domain">("default");
   const [globalSettings, setGlobalSettings] = useState<TTSSettings | null>(null);
   const [domainSettings, setDomainSettings] = useState<TTSSettings | null>(null);
@@ -62,6 +66,7 @@ export function SettingsPanel({ position, onClose, domain, theme, visible = true
   const [downloadingVoice, setDownloadingVoice] = useState<string | null>(null);
   const [rulesExpanded, setRulesExpanded] = useState(false);
   const [ruleErrors, setRuleErrors] = useState<Set<number>>(new Set());
+  const [focusedRuleIndex, setFocusedRuleIndex] = useState<number | null>(null);
   const [noiseExpanded, setNoiseExpanded] = useState(false);
   const [noiseSelectorInput, setNoiseSelectorInput] = useState("");
   const [activePill, setActivePill] = useState<number | null>(null);
@@ -331,7 +336,14 @@ export function SettingsPanel({ position, onClose, domain, theme, visible = true
         <div className="settings-rules-section">
           <button
             className="settings-rules-toggle"
-            onClick={() => setRulesExpanded(!rulesExpanded)}
+            onClick={() => {
+              const next = !rulesExpanded;
+              setRulesExpanded(next);
+              if (!next) {
+                setFocusedRuleIndex(null);
+                onRulePreviewHide?.();
+              }
+            }}
           >
             <span className={`settings-rules-chevron${rulesExpanded ? " open" : ""}`}>&#9654;</span>
             Text rules ({settings.textReplacements.length})
@@ -339,84 +351,124 @@ export function SettingsPanel({ position, onClose, domain, theme, visible = true
           {rulesExpanded && (
             <>
               <div className="settings-rules-list">
-                {settings.textReplacements.map((rule, i) => (
-                  <div key={i} className="settings-rule-row">
-                    <input
-                      className={`settings-rule-input${ruleErrors.has(i) ? " rule-error" : ""}`}
-                      type="text"
-                      value={rule.pattern}
-                      placeholder="Regex pattern"
-                      spellCheck={false}
-                      onFocus={() => onSelectorFocus?.()}
-                      onBlur={(e) => {
-                        onSelectorBlur?.();
-                        const val = e.target.value;
-                        if (!val) { setRuleErrors(prev => { const s = new Set(prev); s.delete(i); return s; }); return; }
-                        try { new RegExp(val); setRuleErrors(prev => { const s = new Set(prev); s.delete(i); return s; }); }
-                        catch { setRuleErrors(prev => new Set(prev).add(i)); }
-                      }}
-                      onChange={(e) => {
-                        const updated = [...settings.textReplacements];
-                        updated[i] = { ...updated[i], pattern: e.target.value };
-                        currentSave({ ...settings, textReplacements: updated });
-                      }}
-                    />
-                    <input
-                      className="settings-rule-input"
-                      type="text"
-                      value={rule.replacement}
-                      placeholder="Replacement ($1, $2...)"
-                      spellCheck={false}
-                      onFocus={() => onSelectorFocus?.()}
-                      onBlur={() => onSelectorBlur?.()}
-                      onChange={(e) => {
-                        const updated = [...settings.textReplacements];
-                        updated[i] = { ...updated[i], replacement: e.target.value };
-                        currentSave({ ...settings, textReplacements: updated });
-                      }}
-                    />
-                    <button
-                      className={`settings-rule-btn ${rule.enabled ? "rule-enabled" : "rule-disabled"}`}
-                      title={rule.enabled ? "Enabled" : "Disabled"}
-                      onClick={() => {
-                        const updated = [...settings.textReplacements];
-                        updated[i] = { ...updated[i], enabled: !updated[i].enabled };
-                        currentSave({ ...settings, textReplacements: updated });
-                      }}
-                    >
-                      {rule.enabled ? "\u25CF" : "\u25CB"}
-                    </button>
-                    <button
-                      className="settings-rule-btn"
-                      title="Delete rule"
-                      onClick={() => {
-                        const updated = settings.textReplacements.filter((_, j) => j !== i);
-                        setRuleErrors(prev => {
-                          const s = new Set<number>();
-                          prev.forEach(idx => { if (idx < i) {s.add(idx);} else if (idx > i) {s.add(idx - 1);} });
-                          return s;
-                        });
-                        currentSave({ ...settings, textReplacements: updated });
-                      }}
-                    >
-                      &times;
-                    </button>
-                  </div>
-                ))}
+                {settings.textReplacements.map((rule, i) => {
+                  const matchCount = rule.pattern && !ruleErrors.has(i) ? (ruleMatchCount?.(rule.pattern, rule.flags || "gi") ?? 0) : 0;
+                  return (
+                    <div key={i} className={`settings-rule-row${focusedRuleIndex === i ? " rule-focused" : ""}`}>
+                      <div className="settings-rule-inputs">
+                        <div className="settings-rule-input-row">
+                          <input
+                            className={`settings-rule-input${ruleErrors.has(i) ? " rule-error" : ""}`}
+                            type="text"
+                            value={rule.pattern}
+                            placeholder="Regex pattern"
+                            spellCheck={false}
+                            onFocus={() => {
+                              onSelectorFocus?.();
+                              setFocusedRuleIndex(i);
+                              if (rule.pattern) {
+                                onRulePreview?.(rule.pattern, rule.flags || "gi", rule.replacement);
+                              }
+                            }}
+                            onBlur={(e) => {
+                              onSelectorBlur?.();
+                              setFocusedRuleIndex(null);
+                              onRulePreviewHide?.();
+                              const val = e.target.value;
+                              if (!val) { setRuleErrors(prev => { const s = new Set(prev); s.delete(i); return s; }); return; }
+                              try { new RegExp(val); setRuleErrors(prev => { const s = new Set(prev); s.delete(i); return s; }); }
+                              catch { setRuleErrors(prev => new Set(prev).add(i)); }
+                            }}
+                            onChange={(e) => {
+                              const updated = [...settings.textReplacements];
+                              updated[i] = { ...updated[i], pattern: e.target.value };
+                              currentSave({ ...settings, textReplacements: updated });
+                              if (e.target.value) {
+                                onRulePreview?.(e.target.value, rule.flags || "gi", rule.replacement);
+                              } else {
+                                onRulePreviewHide?.();
+                              }
+                            }}
+                          />
+                          {matchCount > 0 && (
+                            <span className="rule-match-count">{matchCount}</span>
+                          )}
+                        </div>
+                        <input
+                          className="settings-rule-input"
+                          type="text"
+                          value={rule.replacement}
+                          placeholder="Replacement ($1, $2...)"
+                          spellCheck={false}
+                          onFocus={() => {
+                            onSelectorFocus?.();
+                            setFocusedRuleIndex(i);
+                            if (rule.pattern) {
+                              onRulePreview?.(rule.pattern, rule.flags || "gi", rule.replacement);
+                            }
+                          }}
+                          onBlur={() => {
+                            onSelectorBlur?.();
+                            setFocusedRuleIndex(null);
+                            onRulePreviewHide?.();
+                          }}
+                          onChange={(e) => {
+                            const updated = [...settings.textReplacements];
+                            updated[i] = { ...updated[i], replacement: e.target.value };
+                            currentSave({ ...settings, textReplacements: updated });
+                            if (rule.pattern) {
+                              onRulePreview?.(rule.pattern, rule.flags || "gi", e.target.value);
+                            }
+                          }}
+                        />
+                      </div>
+                      <button
+                        className="settings-rule-btn"
+                        title="Delete rule"
+                        onClick={() => {
+                          const updated = settings.textReplacements.filter((_, j) => j !== i);
+                          setRuleErrors(prev => {
+                            const s = new Set<number>();
+                            prev.forEach(idx => { if (idx < i) {s.add(idx);} else if (idx > i) {s.add(idx - 1);} });
+                            return s;
+                          });
+                          if (focusedRuleIndex === i) {
+                            setFocusedRuleIndex(null);
+                            onRulePreviewHide?.();
+                          }
+                          currentSave({ ...settings, textReplacements: updated });
+                        }}
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-              <button
-                className="settings-rule-add-btn"
-                onClick={() => {
-                  const newRule: TextReplacementRule = { pattern: "", replacement: "", flags: "gi", enabled: true };
-                  currentSave({ ...settings, textReplacements: [...settings.textReplacements, newRule] });
-                }}
-              >
-                + Add rule
-              </button>
+              <div className="settings-rule-actions">
+                <button
+                  className="settings-rule-add-btn"
+                  onClick={() => {
+                    const newRule: TextReplacementRule = { pattern: "", replacement: "", flags: "gi", enabled: true };
+                    currentSave({ ...settings, textReplacements: [...settings.textReplacements, newRule] });
+                  }}
+                >
+                  + Add rule
+                </button>
+                <button className="settings-selector-btn" onClick={onPickTextRule} title="Pick text from page">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 7V4h16v3" />
+                    <path d="M9 20h6" />
+                    <path d="M12 4v16" />
+                  </svg>
+                </button>
+              </div>
               <button
                 className="settings-rule-reset-btn"
                 onClick={() => {
                   setRuleErrors(new Set());
+                  setFocusedRuleIndex(null);
+                  onRulePreviewHide?.();
                   currentSave({ ...settings, textReplacements: DEFAULT_TEXT_REPLACEMENTS });
                 }}
               >

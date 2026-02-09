@@ -17,6 +17,7 @@ vi.mock("../shared/settings", () => {
       textReplacements: [
         { pattern: "\\be\\.g\\.\\s*", replacement: "for example, ", flags: "gi", enabled: true },
       ],
+      noiseSelectors: ["nav", "footer"],
     }),
     getDomainSettings: vi.fn().mockResolvedValue(null),
     saveGlobalSettings: vi.fn().mockResolvedValue(undefined),

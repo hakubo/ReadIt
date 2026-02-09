@@ -710,8 +710,46 @@ export const SHADOW_STYLES = `
   }
   .settings-rule-row {
     display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 3px 0;
+    border-left: 2px solid transparent;
+    padding-left: 4px;
+    transition: border-color 0.15s ease;
+  }
+  .settings-rule-row.rule-focused {
+    border-left-color: #3b82f6;
+  }
+  .settings-rule-inputs {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .settings-rule-input-row {
+    display: flex;
     align-items: center;
     gap: 4px;
+  }
+  .rule-match-count {
+    font-size: 9px;
+    color: #60a5fa;
+    flex-shrink: 0;
+    font-family: ui-monospace, monospace;
+  }
+  .settings-panel.theme-light .rule-match-count {
+    color: #3b82f6;
+  }
+  .settings-rule-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+    align-items: center;
+  }
+  .settings-rule-actions .settings-rule-add-btn {
+    flex: 1;
+    margin-top: 0;
   }
   .settings-rule-input {
     flex: 1;
@@ -764,6 +802,9 @@ export const SHADOW_STYLES = `
   }
   .settings-rule-btn.rule-disabled {
     color: #6b7280;
+  }
+  .settings-rule-row .settings-rule-btn {
+    margin-top: 2px;
   }
   .settings-rule-add-btn {
     display: block;

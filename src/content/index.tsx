@@ -9,6 +9,7 @@ import { detectMainContent, setNoiseSelector } from "./contentDetection";
 import { splitIntoSentences, humanizeText, replaceUrlsWithTitles } from "./textProcessing";
 import { HighlightManager } from "./highlighting";
 import { ElementPicker } from "./elementPicker";
+import { TextRuleOverlay } from "./textRuleOverlay";
 import { AudioEngine } from "./audioEngine";
 
 // ---------------------------------------------------------------------------
@@ -110,6 +111,7 @@ let seekCursorStyle: HTMLStyleElement | null = null;
 // ---------------------------------------------------------------------------
 const highlightManager = new HighlightManager();
 const elementPicker = new ElementPicker();
+const textRuleOverlay = new TextRuleOverlay();
 
 const audioEngine = new AudioEngine({
   onPlayStateChange(isPlaying: boolean) {
@@ -393,6 +395,47 @@ function noiseMatchCountCallback(selector: string): number {
   return elementPicker.countNoiseMatches(selector, sitePrefs.contentSelector);
 }
 
+// Text rule overlay callbacks
+function handleRulePreviewCallback(pattern: string, flags: string, replacement: string) {
+  textRuleOverlay.showRulePreview(pattern, flags, replacement);
+}
+
+function handleRulePreviewHideCallback() {
+  textRuleOverlay.hideRulePreview();
+}
+
+function handlePickTextRuleCallback() {
+  textRuleOverlay.startTextPicker(
+    (pattern) => {
+      void (async () => {
+        const settings = await getSettings();
+        const newRule = { pattern, replacement: "", flags: "gi", enabled: true };
+        const updated = { ...settings, textReplacements: [...settings.textReplacements, newRule] };
+        const domainSettings = await getDomainSettings(currentDomain);
+        if (domainSettings) {
+          await saveDomainSettings(currentDomain, updated);
+        } else {
+          await saveGlobalSettings(updated);
+        }
+      })();
+    },
+    () => {
+      // cancelled — no action needed
+    },
+  );
+}
+
+function ruleMatchCountCallback(pattern: string, flags: string): number {
+  try {
+    const regex = new RegExp(pattern, flags || "gi");
+    const text = document.body.textContent || "";
+    const matches = text.match(regex);
+    return matches ? matches.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Shadow DOM helpers
 // ---------------------------------------------------------------------------
@@ -480,6 +523,10 @@ function showPlayer() {
         onNoisePreviewHide={handleNoisePreviewHideCallback}
         onPickNoise={handlePickNoiseCallback}
         noiseMatchCount={noiseMatchCountCallback}
+        onRulePreview={handleRulePreviewCallback}
+        onRulePreviewHide={handleRulePreviewHideCallback}
+        onPickTextRule={handlePickTextRuleCallback}
+        ruleMatchCount={ruleMatchCountCallback}
       />
     );
   }
