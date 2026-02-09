@@ -13,6 +13,7 @@ export class ElementPicker {
 
   // Selector preview state (shown when settings input is focused)
   private previewHighlight: HTMLDivElement | null = null;
+  private previewExtras: HTMLDivElement[] = [];
 
   isActive(): boolean {
     return this.active;
@@ -132,10 +133,10 @@ export class ElementPicker {
     const rect = matches[0].getBoundingClientRect();
     this.previewHighlight = document.createElement("div");
     this.previewHighlight.style.cssText = `
-      position: fixed; pointer-events: none; z-index: 2147483645;
+      position: absolute; pointer-events: none; z-index: 2147483645;
       border: 2px solid ${color}; background: ${bg};
       border-radius: 4px;
-      left: ${rect.left}px; top: ${rect.top}px;
+      left: ${rect.left + window.scrollX}px; top: ${rect.top + window.scrollY}px;
       width: ${rect.width}px; height: ${rect.height}px;
     `;
 
@@ -145,13 +146,14 @@ export class ElementPicker {
         const extra = document.createElement("div");
         extra.className = "selector-preview-extra";
         extra.style.cssText = `
-          position: fixed; pointer-events: none; z-index: 2147483645;
+          position: absolute; pointer-events: none; z-index: 2147483645;
           border: 2px dashed rgba(239,68,68,0.6);
           border-radius: 4px;
-          left: ${r.left}px; top: ${r.top}px;
+          left: ${r.left + window.scrollX}px; top: ${r.top + window.scrollY}px;
           width: ${r.width}px; height: ${r.height}px;
         `;
-        this.previewHighlight.appendChild(extra);
+        document.documentElement.appendChild(extra);
+        this.previewExtras.push(extra);
       }
     }
 
@@ -164,6 +166,8 @@ export class ElementPicker {
       this.previewHighlight.remove();
       this.previewHighlight = null;
     }
+    for (const h of this.previewExtras) {h.remove();}
+    this.previewExtras = [];
   }
 
   // Noise selector preview state
@@ -190,10 +194,10 @@ export class ElementPicker {
       const bRect = boundary.getBoundingClientRect();
       this.contentAreaHighlight = document.createElement("div");
       this.contentAreaHighlight.style.cssText = `
-        position: fixed; pointer-events: none; z-index: 2147483644;
+        position: absolute; pointer-events: none; z-index: 2147483644;
         border: 2px dashed #a855f7; background: rgba(168,85,247,0.04);
         border-radius: 4px;
-        left: ${bRect.left}px; top: ${bRect.top}px;
+        left: ${bRect.left + window.scrollX}px; top: ${bRect.top + window.scrollY}px;
         width: ${bRect.width}px; height: ${bRect.height}px;
       `;
       const label = document.createElement("div");
@@ -223,10 +227,10 @@ export class ElementPicker {
       if (rect.width === 0 && rect.height === 0) {continue;}
       const box = document.createElement("div");
       box.style.cssText = `
-        position: fixed; pointer-events: none; z-index: 2147483645;
+        position: absolute; pointer-events: none; z-index: 2147483645;
         border: 2px solid rgba(239,68,68,0.7); background: rgba(239,68,68,0.08);
         border-radius: 4px;
-        left: ${rect.left}px; top: ${rect.top}px;
+        left: ${rect.left + window.scrollX}px; top: ${rect.top + window.scrollY}px;
         width: ${rect.width}px; height: ${rect.height}px;
       `;
       document.documentElement.appendChild(box);
