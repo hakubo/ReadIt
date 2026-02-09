@@ -10,6 +10,7 @@ import { splitIntoSentences, humanizeText, replaceUrlsWithTitles } from "./textP
 import { HighlightManager } from "./highlighting";
 import { ElementPicker } from "./elementPicker";
 import { AudioEngine } from "./audioEngine";
+import { observeRouteChanges } from "./routeObserver";
 
 // ---------------------------------------------------------------------------
 // Extension context invalidation guard
@@ -947,6 +948,25 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ---------------------------------------------------------------------------
+// SPA route change handling
+// ---------------------------------------------------------------------------
+function handleRouteChange() {
+  if (!extensionEnabled) {return;}
+
+  const hasActivePlayback = isStreaming || isLoading || playerState.isPlaying || playerState.queueLength > 0;
+  if (hasActivePlayback) {
+    stopPlayback();
+  }
+}
+
+function handleRouteContentReady() {
+  if (!extensionEnabled) {return;}
+
+  estimatePageDuration();
+  updatePlayer();
+}
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 function estimatePageDuration() {
@@ -1004,6 +1024,18 @@ async function init() {
   estimatePageDuration();
   showPlayer();
   setupContentObserver();
+
+  // Detect SPA route changes: stop playback and re-detect content.
+  observeRouteChanges(handleRouteChange, handleRouteContentReady);
+
+  if (document.readyState !== "complete") {
+    window.addEventListener("load", () => {
+      if (!isLoading && !isStreaming) {
+        estimatePageDuration();
+        updatePlayer();
+      }
+    }, { once: true });
+  }
 }
 
 init();
