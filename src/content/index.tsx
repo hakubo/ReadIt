@@ -10,6 +10,7 @@ import { splitIntoSentences, humanizeText, replaceUrlsWithTitles } from "./textP
 import { HighlightManager } from "./highlighting";
 import { ElementPicker } from "./elementPicker";
 import { AudioEngine } from "./audioEngine";
+import { observeRouteChanges } from "./routeObserver";
 
 // ---------------------------------------------------------------------------
 // Extension context invalidation guard
@@ -621,7 +622,11 @@ async function handleRead() {
   } catch (error) {
     console.error("TTS generation failed:", error);
     isLoading = false;
-    if (!closedManually) {
+    // Suppress alert when playback was stopped intentionally (route change,
+    // user close, page unload) or when the message channel was broken by
+    // navigation — these are expected interruptions, not actionable errors.
+    const isChannelClosed = error instanceof Error && error.message.includes("message channel closed");
+    if (!closedManually && !isChannelClosed) {
       stopPlayback();
       alert(
         `TTS generation failed: ${error instanceof Error ? error.message : "Unknown error"}`
@@ -947,6 +952,25 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ---------------------------------------------------------------------------
+// SPA route change handling
+// ---------------------------------------------------------------------------
+function handleRouteChange() {
+  if (!extensionEnabled) {return;}
+
+  const hasActivePlayback = isStreaming || isLoading || playerState.isPlaying || playerState.queueLength > 0;
+  if (hasActivePlayback) {
+    stopPlayback();
+  }
+}
+
+function handleRouteContentReady() {
+  if (!extensionEnabled) {return;}
+
+  estimatePageDuration();
+  updatePlayer();
+}
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 function estimatePageDuration() {
@@ -1004,6 +1028,24 @@ async function init() {
   estimatePageDuration();
   showPlayer();
   setupContentObserver();
+
+  // Detect SPA route changes: stop playback and re-detect content.
+  observeRouteChanges(handleRouteChange, handleRouteContentReady);
+
+  // Suppress spurious TTS error alerts during real navigation.
+  // beforeunload fires synchronously before the page unloads — earlier than
+  // the debounced MutationObserver, so the catch block in handleRead() can
+  // check closedManually and skip the alert.
+  window.addEventListener("beforeunload", () => { closedManually = true; });
+
+  if (document.readyState !== "complete") {
+    window.addEventListener("load", () => {
+      if (!isLoading && !isStreaming) {
+        estimatePageDuration();
+        updatePlayer();
+      }
+    }, { once: true });
+  }
 }
 
 init();
