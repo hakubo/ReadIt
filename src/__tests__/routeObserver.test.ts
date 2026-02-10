@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { observeRouteChanges } from "../content/routeObserver";
 
 describe("observeRouteChanges", () => {
-  let onRouteChange: ReturnType<typeof vi.fn>;
-  let onContentReady: ReturnType<typeof vi.fn>;
+  let onRouteChange: ReturnType<typeof vi.fn<() => void>>;
+  let onContentReady: ReturnType<typeof vi.fn<() => void>>;
   let cleanup: () => void;
   let mutationCallback: MutationCallback;
 
@@ -11,8 +11,8 @@ describe("observeRouteChanges", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    onRouteChange = vi.fn();
-    onContentReady = vi.fn();
+    onRouteChange = vi.fn<() => void>();
+    onContentReady = vi.fn<() => void>();
 
     // Capture the MutationObserver callback so we can trigger it manually
     vi.spyOn(MutationObserver.prototype, "observe");

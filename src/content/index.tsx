@@ -622,7 +622,11 @@ async function handleRead() {
   } catch (error) {
     console.error("TTS generation failed:", error);
     isLoading = false;
-    if (!closedManually) {
+    // Suppress alert when playback was stopped intentionally (route change,
+    // user close, page unload) or when the message channel was broken by
+    // navigation — these are expected interruptions, not actionable errors.
+    const isChannelClosed = error instanceof Error && error.message.includes("message channel closed");
+    if (!closedManually && !isChannelClosed) {
       stopPlayback();
       alert(
         `TTS generation failed: ${error instanceof Error ? error.message : "Unknown error"}`
@@ -1027,6 +1031,12 @@ async function init() {
 
   // Detect SPA route changes: stop playback and re-detect content.
   observeRouteChanges(handleRouteChange, handleRouteContentReady);
+
+  // Suppress spurious TTS error alerts during real navigation.
+  // beforeunload fires synchronously before the page unloads — earlier than
+  // the debounced MutationObserver, so the catch block in handleRead() can
+  // check closedManually and skip the alert.
+  window.addEventListener("beforeunload", () => { closedManually = true; });
 
   if (document.readyState !== "complete") {
     window.addEventListener("load", () => {
