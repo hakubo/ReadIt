@@ -5,20 +5,29 @@ import type { TextReplacementRule } from "@/shared/types";
 
 /** Split text into sentences using Intl.Segmenter (same logic as offscreen). */
 export function splitIntoSentences(text: string): string[] {
-  let result: string[];
+  // Split on newlines first to respect paragraph boundaries.
+  // Paragraphs ending without sentence-ending punctuation (e.g., with an emoji)
+  // would otherwise be merged with the next paragraph by Intl.Segmenter.
+  const lines = text.split(/\n+/).map(l => l.trim()).filter(l => l.length > 0);
+
   try {
-    // Intl.Segmenter provides proper sentence boundary detection
     const Segmenter = (Intl as unknown as { Segmenter: new (locale: string, options: { granularity: string }) => { segment: (text: string) => Iterable<{ segment: string }> } }).Segmenter;
     const segmenter = new Segmenter('en', { granularity: 'sentence' });
-    const segments = segmenter.segment(text);
-    result = Array.from(segments, (s: { segment: string }) => s.segment.trim()).filter(s => s.length > 0);
+    const result: string[] = [];
+    for (const line of lines) {
+      const segments = segmenter.segment(line);
+      result.push(...Array.from(segments, (s: { segment: string }) => s.segment.trim()).filter(s => s.length > 0));
+    }
+    return result;
   } catch {
     // Fallback for environments without Intl.Segmenter support
-    const sentences = text.split(/(?<=[.!?])\s+/);
-    result = sentences.map(s => s.trim()).filter(s => s.length > 0);
+    const result: string[] = [];
+    for (const line of lines) {
+      const sentences = line.split(/(?<=[.!?])\s+/);
+      result.push(...sentences.map(s => s.trim()).filter(s => s.length > 0));
+    }
+    return result;
   }
-
-  return result;
 }
 
 /** Apply regex-based text replacement rules. */

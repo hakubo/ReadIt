@@ -18,6 +18,32 @@ describe("splitIntoSentences", () => {
     expect(result.length).toBeGreaterThan(0);
     expect(result.join(" ")).toBe("Hello world");
   });
+
+  it("splits paragraphs joined by newlines even without terminal punctuation", () => {
+    const text = "First paragraph ends with emoji 🎆\nSecond paragraph starts here.";
+    const result = splitIntoSentences(text);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe("First paragraph ends with emoji 🎆");
+    expect(result[1]).toBe("Second paragraph starts here.");
+  });
+
+  it("splits multiple newline-separated paragraphs without periods", () => {
+    const text = "Line one\nLine two\nLine three";
+    const result = splitIntoSentences(text);
+    expect(result).toEqual(["Line one", "Line two", "Line three"]);
+  });
+
+  it("handles newlines within punctuated text", () => {
+    const text = "First sentence. Second sentence.\nThird sentence. Fourth sentence.";
+    const result = splitIntoSentences(text);
+    expect(result).toEqual(["First sentence.", "Second sentence.", "Third sentence.", "Fourth sentence."]);
+  });
+
+  it("ignores blank lines between paragraphs", () => {
+    const text = "Paragraph one.\n\n\nParagraph two.";
+    const result = splitIntoSentences(text);
+    expect(result).toEqual(["Paragraph one.", "Paragraph two."]);
+  });
 });
 
 describe("humanizeText", () => {
