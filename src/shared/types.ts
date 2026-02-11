@@ -33,6 +33,7 @@ export interface TTSSettings {
   theme: "light" | "dark";
   textReplacements: TextReplacementRule[];
   noiseSelectors: string[];
+  skipEmojis: boolean;
 }
 
 export const DEFAULT_NOISE_SELECTORS: string[] = [
@@ -52,6 +53,7 @@ export const DEFAULT_SETTINGS: TTSSettings = {
   theme: "dark",
   textReplacements: DEFAULT_TEXT_REPLACEMENTS,
   noiseSelectors: DEFAULT_NOISE_SELECTORS,
+  skipEmojis: false,
 };
 
 export interface SitePrefs {

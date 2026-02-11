@@ -42,6 +42,14 @@ export function humanizeText(text: string, rules: TextReplacementRule[]): string
   return result;
 }
 
+/** Remove emoji characters from text and collapse leftover whitespace. */
+export function stripEmojis(text: string): string {
+  return text
+    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function extractUrls(text: string): string[] {
   const urlRegex = /https?:\/\/[^\s<>"')\]]+/g;
   return text.match(urlRegex) || [];
