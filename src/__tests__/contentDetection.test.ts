@@ -213,6 +213,56 @@ describe("extractTextFromContainer", () => {
     expect(text).toContain("Section Title");
     expect(text).toContain("Body text that is much longer");
   });
+
+  it("preserves non-breaking spaces in extracted text", () => {
+    document.body.innerHTML = `
+      <div id="container">
+        <p>Hello\u00a0world and\u00a0goodbye.</p>
+      </div>
+    `;
+    const container = document.getElementById("container")!;
+    const text = extractTextFromContainer(container);
+    expect(text).toContain("\u00a0");
+    expect(text).toBe("Hello\u00a0world and\u00a0goodbye.");
+  });
+
+  it("preserves non-breaking spaces in Notion-like div structure", () => {
+    document.body.innerHTML = `
+      <div id="container">
+        <div>First\u00a0paragraph with\u00a0special spaces.</div>
+        <div>Second\u00a0paragraph here.</div>
+      </div>
+    `;
+    const container = document.getElementById("container")!;
+    const text = extractTextFromContainer(container);
+    expect(text).toContain("First\u00a0paragraph");
+    expect(text).toContain("Second\u00a0paragraph");
+  });
+
+  it("collapses regular whitespace but preserves non-breaking spaces", () => {
+    document.body.innerHTML = `
+      <div id="container">
+        <p>Multiple   regular   spaces\u00a0and non-breaking.</p>
+      </div>
+    `;
+    const container = document.getElementById("container")!;
+    const text = extractTextFromContainer(container);
+    // Regular spaces should be collapsed to single space
+    expect(text).not.toContain("   ");
+    // Non-breaking space should be preserved
+    expect(text).toContain("\u00a0");
+  });
+
+  it("preserves narrow no-break space (U+202F) and other Unicode whitespace", () => {
+    document.body.innerHTML = `
+      <div id="container">
+        <p>Value: 100\u202F% done.</p>
+      </div>
+    `;
+    const container = document.getElementById("container")!;
+    const text = extractTextFromContainer(container);
+    expect(text).toContain("\u202f");
+  });
 });
 
 describe("detectMainContent", () => {

@@ -157,6 +157,42 @@ export function getScrollOffset(container: Element | null): ScrollOffset {
   };
 }
 
+/** Minimum character count before a truncated search prefix is generated. */
+const LONG_SENTENCE_THRESHOLD = 200;
+const TRUNCATED_PREFIX_LENGTH = 80;
+
+/**
+ * Generate search variants for a sentence to increase the chance
+ * that window.find() locates it in the DOM.
+ *
+ * The DOM may use non-breaking spaces (\u00a0) where extracted text has
+ * regular spaces (or vice-versa). We produce multiple whitespace variants
+ * so the highlighting pass can try each one.
+ *
+ * For very long sentences we also include a truncated prefix variant — some
+ * browsers struggle with long search strings in window.find().
+ */
+export function generateSearchVariants(sentence: string): string[] {
+  const variants: string[] = [sentence];
+
+  const withRegularSpaces = sentence.replace(/\u00a0/g, " ");
+  if (withRegularSpaces !== sentence) {
+    variants.push(withRegularSpaces);
+  }
+
+  const withNbsp = sentence.replace(/ /g, "\u00a0");
+  if (withNbsp !== sentence) {
+    variants.push(withNbsp);
+  }
+
+  if (sentence.length > LONG_SENTENCE_THRESHOLD) {
+    const prefix = sentence.slice(0, TRUNCATED_PREFIX_LENGTH);
+    variants.push(prefix);
+  }
+
+  return variants;
+}
+
 export class HighlightManager {
   private highlightOverlay: HTMLDivElement | null = null;
   private currentHighlightBoxes: HTMLDivElement[] = [];
@@ -247,8 +283,64 @@ export class HighlightManager {
   }
 
   /**
+   * Try to find a sentence string in the DOM via window.find(), skipping
+   * noise ancestors. Returns the merged, absolute-positioned rects or [].
+   */
+  private findSentenceViaWindowFind(
+    text: string,
+    selection: Selection,
+    windowFind: (str: string, caseSensitive?: boolean, backwards?: boolean, wrapAround?: boolean, wholeWord?: boolean, searchInFrames?: boolean, showDialog?: boolean) => boolean,
+    scrollContainerDetected: boolean,
+  ): { rects: DOMRect[]; colors: SentenceColors | null; scrollContainerDetected: boolean } {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const found = windowFind.call(window, text, true, false, false, false, true, false);
+      if (!found || selection.rangeCount === 0) {break;}
+
+      const range = selection.getRangeAt(0);
+      const container = range.commonAncestorContainer;
+      const el = container.nodeType === Node.ELEMENT_NODE
+        ? container as Element
+        : container.parentElement;
+
+      if (!scrollContainerDetected && el) {
+        this.scrollContainer = findScrollContainer(el);
+        scrollContainerDetected = true;
+      }
+
+      const boundary = this.scrollContainer ?? document.documentElement;
+      if (el && hasNoiseAncestor(el, boundary)) {
+        continue;
+      }
+
+      const offset = getScrollOffset(this.scrollContainer);
+      const clientRects = this.mergeRects(range.getClientRects());
+      const rects = clientRects.map(r => new DOMRect(
+        r.left - offset.offsetLeft + offset.scrollLeft,
+        r.top - offset.offsetTop + offset.scrollTop,
+        r.width,
+        r.height
+      ));
+
+      // Sample bg/text colors for contrast-aware highlight adjustment
+      let colors: SentenceColors | null = null;
+      if (el) {
+        const bgColor = getEffectiveBackgroundColor(el);
+        const textParsed = parseColor(getComputedStyle(el).color);
+        colors = { bg: bgColor, text: { r: textParsed.r, g: textParsed.g, b: textParsed.b } };
+      }
+
+      return { rects, colors, scrollContainerDetected };
+    }
+    return { rects: [], colors: null, scrollContainerDetected };
+  }
+
+  /**
    * Pre-compute rects for ALL sentences in a single sequential window.find() pass.
    * Sequential calls naturally find the correct occurrence in DOM order.
+   *
+   * When the primary search fails, whitespace-variant fallbacks are tried
+   * (e.g. non-breaking space ↔ regular space) to handle sites like Notion
+   * and Google Docs that use \u00a0 in their DOM text.
    */
   precomputeAllSentenceRects(): void {
     const selection = window.getSelection();
@@ -268,46 +360,20 @@ export class HighlightManager {
     let scrollContainerDetected = false;
 
     for (let s = 0; s < this.sentences.length; s++) {
+      const variants = generateSearchVariants(this.sentences[s]);
       let rects: DOMRect[] = [];
       let colors: SentenceColors | null = null;
 
-      for (let attempt = 0; attempt < 10; attempt++) {
-        const found = windowFind.call(window, this.sentences[s], true, false, false, false, true, false);
-        if (!found || selection.rangeCount === 0) {break;}
-
-        const range = selection.getRangeAt(0);
-        const container = range.commonAncestorContainer;
-        const el = container.nodeType === Node.ELEMENT_NODE
-          ? container as Element
-          : container.parentElement;
-
-        // Detect scroll container from the first matched sentence
-        if (!scrollContainerDetected && el) {
-          this.scrollContainer = findScrollContainer(el);
-          scrollContainerDetected = true;
+      for (const variant of variants) {
+        const result = this.findSentenceViaWindowFind(
+          variant, selection, windowFind, scrollContainerDetected,
+        );
+        scrollContainerDetected = result.scrollContainerDetected;
+        if (result.rects.length > 0) {
+          rects = result.rects;
+          colors = result.colors;
+          break;
         }
-
-        const boundary = this.scrollContainer ?? document.documentElement;
-        if (el && hasNoiseAncestor(el, boundary)) {
-          continue;
-        }
-
-        const offset = getScrollOffset(this.scrollContainer);
-        const clientRects = this.mergeRects(range.getClientRects());
-        rects = clientRects.map(r => new DOMRect(
-          r.left - offset.offsetLeft + offset.scrollLeft,
-          r.top - offset.offsetTop + offset.scrollTop,
-          r.width,
-          r.height
-        ));
-
-        // Sample bg/text colors for contrast-aware highlight adjustment
-        if (el) {
-          const bgColor = getEffectiveBackgroundColor(el);
-          const textParsed = parseColor(getComputedStyle(el).color);
-          colors = { bg: bgColor, text: { r: textParsed.r, g: textParsed.g, b: textParsed.b } };
-        }
-        break;
       }
 
       this.sentenceRectsCache.push(rects);

@@ -7,6 +7,7 @@ import {
   relativeLuminance,
   contrastRatio,
   blendChannel,
+  generateSearchVariants,
 } from "../content/highlighting";
 
 describe("HighlightManager", () => {
@@ -651,5 +652,53 @@ describe("contrast utilities", () => {
     it("returns midpoint at alpha=0.5", () => {
       expect(blendChannel(100, 200, 0.5)).toBe(150);
     });
+  });
+});
+
+describe("generateSearchVariants", () => {
+  it("returns original sentence as first variant", () => {
+    const variants = generateSearchVariants("Hello world.");
+    expect(variants[0]).toBe("Hello world.");
+  });
+
+  it("generates nbsp variant when sentence has regular spaces", () => {
+    const variants = generateSearchVariants("Hello world.");
+    expect(variants).toContain("Hello\u00a0world.");
+  });
+
+  it("generates regular-space variant when sentence has nbsp", () => {
+    const variants = generateSearchVariants("Hello\u00a0world.");
+    expect(variants).toContain("Hello world.");
+  });
+
+  it("does not duplicate when sentence has no spaces", () => {
+    const variants = generateSearchVariants("Hello.");
+    expect(variants).toEqual(["Hello."]);
+  });
+
+  it("handles mixed regular and non-breaking spaces", () => {
+    const sentence = "Hello\u00a0world and goodbye.";
+    const variants = generateSearchVariants(sentence);
+    // Should include original
+    expect(variants[0]).toBe(sentence);
+    // Should include all-regular-spaces version
+    expect(variants).toContain("Hello world and goodbye.");
+    // Should include all-nbsp version
+    expect(variants).toContain("Hello\u00a0world\u00a0and\u00a0goodbye.");
+  });
+
+  it("generates truncated variant for long sentences", () => {
+    const longSentence = "The " + "quick brown fox jumps over the lazy dog and ".repeat(10) + "finally rests.";
+    const variants = generateSearchVariants(longSentence);
+    // Should include a truncated variant
+    const hasShortVariant = variants.some(v => v.length < longSentence.length && longSentence.startsWith(v));
+    expect(hasShortVariant).toBe(true);
+  });
+
+  it("does not generate truncated variant for short sentences", () => {
+    const variants = generateSearchVariants("Short sentence.");
+    // All variants should be about the same length (just space substitutions)
+    const hasShortVariant = variants.some(v => v.length < 10);
+    expect(hasShortVariant).toBe(false);
   });
 });

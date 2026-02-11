@@ -3,6 +3,11 @@
 
 import { DEFAULT_NOISE_SELECTORS } from "@/shared/types";
 
+// Collapse runs of ASCII whitespace (space, tab, newline, etc.) into a single space.
+// Preserves non-breaking spaces (\u00a0) and other Unicode whitespace so that
+// extracted text matches the DOM for window.find() highlighting.
+const ASCII_WS = /[ \t\n\r\f\v]+/g;
+
 // Mutable noise selector string, updated via setNoiseSelector() when settings load.
 // ES module live bindings ensure importers always see the latest value.
 export let NOISE_SELECTOR = DEFAULT_NOISE_SELECTORS.join(",");
@@ -30,7 +35,7 @@ export function extractTextFromContainer(container: Element): string {
   for (const block of blocks) {
     if (hasNoiseAncestor(block, container)) {continue;}
     if (block.querySelector(BLOCK_SELECTOR)) {continue;}
-    const t = (block.textContent || "").trim().replace(/\s+/g, " ");
+    const t = (block.textContent || "").trim().replace(ASCII_WS, " ");
     if (t.length > 0) {texts.push(t);}
   }
   const blockText = texts.join("\n");
@@ -47,7 +52,7 @@ export function extractTextFromContainer(container: Element): string {
   for (const child of contentEl.children) {
     if (child instanceof HTMLElement && child.matches(NOISE_SELECTOR)) {continue;}
     if (child instanceof HTMLElement && hasNoiseAncestor(child, contentEl)) {continue;}
-    const t = (child.textContent || "").trim().replace(/\s+/g, " ");
+    const t = (child.textContent || "").trim().replace(ASCII_WS, " ");
     if (t.length > 0) {childTexts.push(t);}
   }
 
@@ -195,7 +200,7 @@ export function detectMainContent(contentSelector?: string): string | null {
   // Last resort: all <p> tags on the page
   const paragraphs = Array.from(document.querySelectorAll("p"))
     .filter((p) => !hasNoiseAncestor(p, document.body))
-    .map((p) => (p.textContent || "").trim().replace(/\s+/g, " "))
+    .map((p) => (p.textContent || "").trim().replace(ASCII_WS, " "))
     .filter((t) => t.length > 20);
   if (paragraphs.length > 0) {
     return paragraphs.join("\n");
