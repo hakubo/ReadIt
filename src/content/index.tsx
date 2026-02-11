@@ -562,7 +562,12 @@ async function handleRead() {
 
   // Split raw text into sentences (matches page DOM for window.find highlighting),
   // then process each sentence individually for TTS.
-  highlightManager.sentences = splitIntoSentences(selectedText).filter(s => s.trim().length > 0);
+  // When skipEmojis is on, drop sentences that are purely emoji (empty after strip).
+  let sentences = splitIntoSentences(selectedText).filter(s => s.trim().length > 0);
+  if (settings.skipEmojis) {
+    sentences = sentences.filter(s => stripEmojis(s).trim().length > 0);
+  }
+  highlightManager.sentences = sentences;
 
   if (highlightManager.sentences.length === 0) {
     console.warn("[unmute.page] No sentences to read after splitting text.");
