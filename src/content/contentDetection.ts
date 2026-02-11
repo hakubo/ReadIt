@@ -35,7 +35,9 @@ export function hasNoiseAncestor(el: Element, boundary: Element): boolean {
  */
 function drillToSingleChild(el: Element, maxDepth = 5): Element {
   if (maxDepth <= 0) {return el;}
-  const children = Array.from(el.children).filter(c => c instanceof HTMLElement);
+  const children = Array.from(el.children).filter(
+    c => c instanceof HTMLElement && (c.textContent || "").trim().length > 0,
+  );
   if (children.length === 1 && children[0].children.length > 0) {
     return drillToSingleChild(children[0], maxDepth - 1);
   }

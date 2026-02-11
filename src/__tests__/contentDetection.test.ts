@@ -326,6 +326,42 @@ describe("extractTextFromContainer", () => {
     expect(text).toContain("Paragraph one content.\nParagraph two content.");
   });
 
+  it("handles real Notion blockquote with empty spacer divs", () => {
+    // Exact Notion structure: blockquote has a border-div with content
+    // AND an empty spacer div sibling (for flex layout). Each notion-text-block
+    // also has an empty spacer child div after the content leaf.
+    // Built with minimal whitespace to simulate React-rendered DOM.
+    const container = document.createElement("div");
+    const quote = document.createElement("div");
+    quote.className = "notion-quote-block";
+    quote.innerHTML =
+      '<blockquote style="display:flex;">' +
+        '<div style="border-inline-start:3px solid;">' +
+          '<div class="leaf">This is a 60-minute conversation with your future engineering manager.</div>' +
+          '<div class="notion-text-block"><div><div class="leaf">We\'ll also do a short code review together. You won\'t need to write any code — we\'re just interested in how you think through trade-offs.</div></div><div style="position:relative;"></div></div>' +
+          '<div class="notion-text-block"><div><div class="leaf">We\'ll save time at the end for your questions.</div></div><div style="position:relative;"></div></div>' +
+          '<div class="notion-text-block"><div><div class="leaf">There are a few things that help:</div></div><div style="position:relative;"></div></div>' +
+          '<div class="notion-bulleted_list-block"><div><div class="leaf">Check out the Q&amp;A document</div></div><div style="position:relative;"></div></div>' +
+          '<div class="notion-text-block"><div><div class="leaf">See you soon!</div></div><div style="position:relative;"></div></div>' +
+        '</div>' +
+        '<div style="position:relative;"></div>' +
+      '</blockquote>';
+    container.appendChild(quote);
+    document.body.appendChild(container);
+
+    const text = extractTextFromContainer(container);
+    const lines = text.split("\n");
+    // Each paragraph must be its own line
+    expect(lines.some(l => l.includes("60-minute conversation"))).toBe(true);
+    expect(lines.some(l => l.includes("think through trade-offs"))).toBe(true);
+    expect(lines.some(l => l.includes("save time at the end"))).toBe(true);
+    expect(lines.some(l => l.endsWith("help:"))).toBe(true);
+    expect(lines).toContain("See you soon!");
+    // Colon-ending line must NOT merge with bullet text
+    const colonLine = lines.find(l => l.endsWith("help:"))!;
+    expect(colonLine).not.toContain("Q&A");
+  });
+
   it("still works with simple blockquotes without nested divs", () => {
     document.body.innerHTML = `
       <div id="container">
