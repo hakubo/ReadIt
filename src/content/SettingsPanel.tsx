@@ -328,6 +328,21 @@ export function SettingsPanel({ position, onClose, domain, theme, visible = true
           </button>
         </div>
 
+        <div className="settings-toggle-row">
+          <span className="settings-label">Skip emojis</span>
+          <button
+            className={`settings-toggle ${settings.skipEmojis ? "active" : ""}`}
+            onClick={() =>
+              currentSave({
+                ...settings,
+                skipEmojis: !settings.skipEmojis,
+              })
+            }
+          >
+            <span className="settings-toggle-knob" />
+          </button>
+        </div>
+
         <div className="settings-rules-section">
           <button
             className="settings-rules-toggle"

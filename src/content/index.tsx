@@ -6,7 +6,7 @@ import { getEffectiveSettings, getDomainSettings, saveGlobalSettings, saveDomain
 import { setPlaybackState } from "./playerStore";
 import { SHADOW_STYLES } from "./styles";
 import { detectMainContent, setNoiseSelector } from "./contentDetection";
-import { splitIntoSentences, humanizeText, replaceUrlsWithTitles } from "./textProcessing";
+import { splitIntoSentences, humanizeText, replaceUrlsWithTitles, stripEmojis } from "./textProcessing";
 import { HighlightManager } from "./highlighting";
 import { ElementPicker } from "./elementPicker";
 import { AudioEngine } from "./audioEngine";
@@ -574,7 +574,13 @@ async function handleRead() {
   highlightManager.highlightColor = highlightColor;
 
   const processedSentences = await Promise.all(
-    highlightManager.sentences.map(async (s) => humanizeText(await replaceUrlsWithTitles(s, safeSendMessage), settings.textReplacements))
+    highlightManager.sentences.map(async (s) => {
+      let processed = humanizeText(await replaceUrlsWithTitles(s, safeSendMessage), settings.textReplacements);
+      if (settings.skipEmojis) {
+        processed = stripEmojis(processed);
+      }
+      return processed;
+    })
   );
 
   // Pre-compute all sentence rects in a single sequential window.find() pass.
