@@ -799,12 +799,18 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (message.type === "EXTENSION_TOGGLE") {
-    extensionEnabled = message.enabled;
-    saveSitePrefs({ enabled: message.enabled });
-    if (!extensionEnabled) {
+    // Toggle based on actual player visibility so the icon click always does
+    // the intuitive thing — including in auto-mode where 'enabled' is undefined.
+    const nowEnabled = !playerRoot;
+    extensionEnabled = nowEnabled;
+    saveSitePrefs({ enabled: nowEnabled });
+    if (!nowEnabled) {
       hideSelectionButton();
       destroyPlayer();
     } else {
+      if (!totalEstimatedDuration) {
+        estimatePageDuration();
+      }
       showPlayer();
     }
   }
@@ -967,6 +973,18 @@ function handleRouteContentReady() {
   if (!extensionEnabled) {return;}
 
   estimatePageDuration();
+
+  // On SPA navigation, show or hide the player based on new content length
+  // (unless the user has an explicit per-domain preference).
+  const AUTO_SHOW_MIN_DURATION = 60;
+  if (sitePrefs.enabled === undefined) {
+    if (totalEstimatedDuration >= AUTO_SHOW_MIN_DURATION && !playerRoot) {
+      showPlayer();
+    } else if (totalEstimatedDuration < AUTO_SHOW_MIN_DURATION && playerRoot && !isStreaming && !isLoading) {
+      destroyPlayer();
+    }
+  }
+
   updatePlayer();
 }
 
@@ -996,7 +1014,16 @@ function setupContentObserver() {
         return;
       }
       attempts++;
+      const hadPlayer = !!playerRoot;
       estimatePageDuration();
+
+      // Auto-show the player once content crosses the threshold (and the
+      // user hasn't explicitly set a preference for this domain).
+      const AUTO_SHOW_MIN_DURATION = 60;
+      if (!hadPlayer && sitePrefs.enabled === undefined && totalEstimatedDuration >= AUTO_SHOW_MIN_DURATION) {
+        showPlayer();
+      }
+
       updatePlayer();
       if (totalEstimatedDuration > 0 || attempts >= MAX_ATTEMPTS) {
         observer.disconnect();
@@ -1026,7 +1053,14 @@ async function init() {
   }
 
   estimatePageDuration();
-  showPlayer();
+
+  // Show player automatically only if the user explicitly enabled it for this
+  // domain, or if there is enough readable content (≥ 1 minute at ~14 chars/s).
+  const AUTO_SHOW_MIN_DURATION = 60;
+  if (sitePrefs.enabled === true || totalEstimatedDuration >= AUTO_SHOW_MIN_DURATION) {
+    showPlayer();
+  }
+
   setupContentObserver();
 
   // Detect SPA route changes: stop playback and re-detect content.
