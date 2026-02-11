@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { HighlightManager, findScrollContainer, getScrollOffset } from "../content/highlighting";
+import {
+  HighlightManager,
+  findScrollContainer,
+  getScrollOffset,
+  parseColor,
+  relativeLuminance,
+  contrastRatio,
+  blendChannel,
+} from "../content/highlighting";
 
 describe("HighlightManager", () => {
   let hm: HighlightManager;
@@ -436,6 +444,212 @@ describe("HighlightManager", () => {
 
       hm.cleanup();
       expect((hm as unknown as { scrollContainer: Element | null }).scrollContainer).toBeNull();
+    });
+  });
+
+  describe("contrast-aware highlighting", () => {
+    it("reduces opacity when highlight over white bg / black text fails contrast", () => {
+      hm.highlightColor = "rgba(254, 240, 138, 0.55)";
+      hm.createHighlightOverlay();
+      hm.sentenceRectsCache = [[new DOMRect(0, 0, 100, 20)]];
+      // White bg, black text — the default 0.55 yellow drops contrast below 4.5:1
+      hm.sentenceColorsCache = [
+        { bg: { r: 255, g: 255, b: 255 }, text: { r: 0, g: 0, b: 0 } },
+      ];
+
+      hm.applyHighlightForSentence(0);
+
+      const overlay = document.getElementById("unmute-highlight-overlay")!;
+      const box = overlay.querySelector("div")!;
+      const bgColor = box.style.backgroundColor;
+      // Opacity should be reduced from 0.55 to maintain contrast
+      const opacityMatch = bgColor.match(/[\d.]+\)$/);
+      expect(opacityMatch).not.toBeNull();
+      const opacity = parseFloat(opacityMatch![0]);
+      expect(opacity).toBeLessThan(0.55);
+      expect(opacity).toBeGreaterThanOrEqual(0.15);
+    });
+
+    it("keeps original color when contrast is already sufficient", () => {
+      // Low-opacity highlight that preserves plenty of contrast
+      hm.highlightColor = "rgba(254, 240, 138, 0.1)";
+      hm.createHighlightOverlay();
+      hm.sentenceRectsCache = [[new DOMRect(0, 0, 100, 20)]];
+      hm.sentenceColorsCache = [
+        { bg: { r: 255, g: 255, b: 255 }, text: { r: 0, g: 0, b: 0 } },
+      ];
+
+      hm.applyHighlightForSentence(0);
+
+      const overlay = document.getElementById("unmute-highlight-overlay")!;
+      const box = overlay.querySelector("div")!;
+      expect(box.style.backgroundColor).toBe("rgba(254, 240, 138, 0.1)");
+    });
+
+    it("falls back to original color when no color data is cached", () => {
+      hm.highlightColor = "rgba(255, 0, 0, 0.5)";
+      hm.createHighlightOverlay();
+      hm.sentenceRectsCache = [[new DOMRect(0, 0, 100, 20)]];
+      // sentenceColorsCache is empty — no color info
+
+      hm.applyHighlightForSentence(0);
+
+      const overlay = document.getElementById("unmute-highlight-overlay")!;
+      const box = overlay.querySelector("div")!;
+      expect(box.style.backgroundColor).toBe("rgba(255, 0, 0, 0.5)");
+    });
+
+    it("adjusts opacity for dark backgrounds too", () => {
+      hm.highlightColor = "rgba(254, 240, 138, 0.55)";
+      hm.createHighlightOverlay();
+      hm.sentenceRectsCache = [[new DOMRect(0, 0, 100, 20)]];
+      // Dark bg (#1a1a1a), light text (#e0e0e0)
+      hm.sentenceColorsCache = [
+        { bg: { r: 26, g: 26, b: 26 }, text: { r: 224, g: 224, b: 224 } },
+      ];
+
+      hm.applyHighlightForSentence(0);
+
+      const overlay = document.getElementById("unmute-highlight-overlay")!;
+      const box = overlay.querySelector("div")!;
+      const bgColor = box.style.backgroundColor;
+      const opacityMatch = bgColor.match(/[\d.]+\)$/);
+      expect(opacityMatch).not.toBeNull();
+      const opacity = parseFloat(opacityMatch![0]);
+      expect(opacity).toBeLessThan(0.55);
+      expect(opacity).toBeGreaterThanOrEqual(0.15);
+    });
+
+    it("also adjusts loading highlight opacity for contrast", () => {
+      hm.highlightColor = "rgba(254, 240, 138, 0.55)";
+      hm.createHighlightOverlay();
+      hm.sentenceRectsCache = [[new DOMRect(0, 0, 100, 20)]];
+      hm.sentenceColorsCache = [
+        { bg: { r: 255, g: 255, b: 255 }, text: { r: 0, g: 0, b: 0 } },
+      ];
+
+      hm.showLoadingHighlight(0);
+
+      const overlay = document.getElementById("unmute-highlight-overlay")!;
+      const box = overlay.querySelector("div")!;
+      const bgColor = box.style.backgroundColor;
+      const opacityMatch = bgColor.match(/[\d.]+\)$/);
+      expect(opacityMatch).not.toBeNull();
+      const opacity = parseFloat(opacityMatch![0]);
+      expect(opacity).toBeLessThan(0.55);
+    });
+
+    it("ensures adjusted highlight maintains >= 4.5:1 contrast ratio", () => {
+      hm.highlightColor = "rgba(254, 240, 138, 0.55)";
+      hm.createHighlightOverlay();
+      hm.sentenceRectsCache = [[new DOMRect(0, 0, 100, 20)]];
+      const bg = { r: 255, g: 255, b: 255 };
+      const text = { r: 0, g: 0, b: 0 };
+      hm.sentenceColorsCache = [{ bg, text }];
+
+      hm.applyHighlightForSentence(0);
+
+      const overlay = document.getElementById("unmute-highlight-overlay")!;
+      const box = overlay.querySelector("div")!;
+      const applied = parseColor(box.style.backgroundColor);
+
+      // Compute the effective contrast with the applied color
+      const effBg = {
+        r: blendChannel(applied.r, bg.r, applied.a),
+        g: blendChannel(applied.g, bg.g, applied.a),
+        b: blendChannel(applied.b, bg.b, applied.a),
+      };
+      const effText = {
+        r: blendChannel(applied.r, text.r, applied.a),
+        g: blendChannel(applied.g, text.g, applied.a),
+        b: blendChannel(applied.b, text.b, applied.a),
+      };
+      const ratio = contrastRatio(
+        relativeLuminance(effBg.r, effBg.g, effBg.b),
+        relativeLuminance(effText.r, effText.g, effText.b)
+      );
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it("cleanup resets sentenceColorsCache", () => {
+      hm.sentenceColorsCache = [
+        { bg: { r: 0, g: 0, b: 0 }, text: { r: 255, g: 255, b: 255 } },
+      ];
+      hm.cleanup();
+      expect(hm.sentenceColorsCache).toEqual([]);
+    });
+  });
+});
+
+describe("contrast utilities", () => {
+  describe("parseColor", () => {
+    it("parses rgb()", () => {
+      expect(parseColor("rgb(255, 128, 0)")).toEqual({ r: 255, g: 128, b: 0, a: 1 });
+    });
+
+    it("parses rgba()", () => {
+      expect(parseColor("rgba(100, 200, 50, 0.5)")).toEqual({ r: 100, g: 200, b: 50, a: 0.5 });
+    });
+
+    it("parses 6-digit hex", () => {
+      expect(parseColor("#ff8000")).toEqual({ r: 255, g: 128, b: 0, a: 1 });
+    });
+
+    it("parses 3-digit hex", () => {
+      expect(parseColor("#f80")).toEqual({ r: 255, g: 136, b: 0, a: 1 });
+    });
+
+    it("returns white for unknown format", () => {
+      expect(parseColor("hsl(0, 100%, 50%)")).toEqual({ r: 255, g: 255, b: 255, a: 1 });
+    });
+  });
+
+  describe("relativeLuminance", () => {
+    it("returns 0 for black", () => {
+      expect(relativeLuminance(0, 0, 0)).toBeCloseTo(0, 4);
+    });
+
+    it("returns 1 for white", () => {
+      expect(relativeLuminance(255, 255, 255)).toBeCloseTo(1, 4);
+    });
+
+    it("returns intermediate value for mid-gray", () => {
+      const lum = relativeLuminance(128, 128, 128);
+      expect(lum).toBeGreaterThan(0.1);
+      expect(lum).toBeLessThan(0.5);
+    });
+  });
+
+  describe("contrastRatio", () => {
+    it("returns 21:1 for black and white", () => {
+      const black = relativeLuminance(0, 0, 0);
+      const white = relativeLuminance(255, 255, 255);
+      expect(contrastRatio(black, white)).toBeCloseTo(21, 0);
+    });
+
+    it("returns 1:1 for same color", () => {
+      const lum = relativeLuminance(128, 128, 128);
+      expect(contrastRatio(lum, lum)).toBeCloseTo(1, 4);
+    });
+
+    it("is symmetric", () => {
+      const l1 = relativeLuminance(200, 100, 50);
+      const l2 = relativeLuminance(50, 100, 200);
+      expect(contrastRatio(l1, l2)).toBe(contrastRatio(l2, l1));
+    });
+  });
+
+  describe("blendChannel", () => {
+    it("returns fg at alpha=1", () => {
+      expect(blendChannel(100, 200, 1)).toBe(100);
+    });
+
+    it("returns bg at alpha=0", () => {
+      expect(blendChannel(100, 200, 0)).toBe(200);
+    });
+
+    it("returns midpoint at alpha=0.5", () => {
+      expect(blendChannel(100, 200, 0.5)).toBe(150);
     });
   });
 });
