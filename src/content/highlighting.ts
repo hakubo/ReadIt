@@ -3,6 +3,105 @@
 
 import { hasNoiseAncestor } from "./contentDetection";
 
+// --- Contrast utilities ---
+
+interface RGB {
+  r: number;
+  g: number;
+  b: number;
+}
+
+interface RGBA extends RGB {
+  a: number;
+}
+
+export interface SentenceColors {
+  bg: RGB;
+  text: RGB;
+}
+
+/** Parse a CSS color string (rgb, rgba, hex) into RGBA components (0-255 for RGB, 0-1 for A). */
+export function parseColor(color: string): RGBA {
+  const rgbaMatch = color.match(
+    /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/
+  );
+  if (rgbaMatch) {
+    return {
+      r: parseFloat(rgbaMatch[1]),
+      g: parseFloat(rgbaMatch[2]),
+      b: parseFloat(rgbaMatch[3]),
+      a: rgbaMatch[4] !== undefined ? parseFloat(rgbaMatch[4]) : 1,
+    };
+  }
+  const hexMatch = color.match(/^#([0-9a-f]{3,8})$/i);
+  if (hexMatch) {
+    let hex = hexMatch[1];
+    if (hex.length === 3) {
+      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    return {
+      r: parseInt(hex.slice(0, 2), 16),
+      g: parseInt(hex.slice(2, 4), 16),
+      b: parseInt(hex.slice(4, 6), 16),
+      a: hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1,
+    };
+  }
+  return { r: 255, g: 255, b: 255, a: 1 };
+}
+
+/** WCAG 2.0 relative luminance (0-1). */
+export function relativeLuminance(r: number, g: number, b: number): number {
+  const [rs, gs, bs] = [r / 255, g / 255, b / 255].map((c) =>
+    c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  );
+  return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+}
+
+/** WCAG contrast ratio between two relative luminance values. */
+export function contrastRatio(l1: number, l2: number): number {
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/** Alpha-blend a foreground channel value over a background channel value. */
+export function blendChannel(fg: number, bg: number, alpha: number): number {
+  return fg * alpha + bg * (1 - alpha);
+}
+
+/**
+ * Walk up from an element to compute the effective opaque background color,
+ * compositing semi-transparent layers. Falls back to white if no opaque ancestor found.
+ */
+export function getEffectiveBackgroundColor(el: Element): RGB {
+  let current: Element | null = el;
+  const layers: RGBA[] = [];
+  while (current && current !== document.documentElement) {
+    const bg = getComputedStyle(current).backgroundColor;
+    if (bg && bg !== "transparent" && bg !== "rgba(0, 0, 0, 0)") {
+      const parsed = parseColor(bg);
+      layers.unshift(parsed);
+      if (parsed.a >= 1) { break; }
+    }
+    current = current.parentElement;
+  }
+  if (!layers.length || layers[0].a < 1) {
+    const docBg = getComputedStyle(document.documentElement).backgroundColor;
+    if (docBg && docBg !== "transparent" && docBg !== "rgba(0, 0, 0, 0)") {
+      layers.unshift(parseColor(docBg));
+    }
+  }
+  let result: RGB = { r: 255, g: 255, b: 255 };
+  for (const layer of layers) {
+    result = {
+      r: blendChannel(layer.r, result.r, layer.a),
+      g: blendChannel(layer.g, result.g, layer.a),
+      b: blendChannel(layer.b, result.b, layer.a),
+    };
+  }
+  return result;
+}
+
 export interface HighlightState {
   sentences: string[];
   sentenceRectsCache: DOMRect[][];
@@ -68,6 +167,7 @@ export class HighlightManager {
 
   sentences: string[] = [];
   sentenceRectsCache: DOMRect[][] = [];
+  sentenceColorsCache: (SentenceColors | null)[] = [];
   currentHighlightIndex = -1;
   highlightingEnabled = true;
   autoScrollEnabled = true;
@@ -164,10 +264,12 @@ export class HighlightManager {
     const windowFind = (window as unknown as { find: (str: string, caseSensitive?: boolean, backwards?: boolean, wrapAround?: boolean, wholeWord?: boolean, searchInFrames?: boolean, showDialog?: boolean) => boolean }).find;
 
     this.sentenceRectsCache = [];
+    this.sentenceColorsCache = [];
     let scrollContainerDetected = false;
 
     for (let s = 0; s < this.sentences.length; s++) {
       let rects: DOMRect[] = [];
+      let colors: SentenceColors | null = null;
 
       for (let attempt = 0; attempt < 10; attempt++) {
         const found = windowFind.call(window, this.sentences[s], true, false, false, false, true, false);
@@ -198,10 +300,18 @@ export class HighlightManager {
           r.width,
           r.height
         ));
+
+        // Sample bg/text colors for contrast-aware highlight adjustment
+        if (el) {
+          const bgColor = getEffectiveBackgroundColor(el);
+          const textParsed = parseColor(getComputedStyle(el).color);
+          colors = { bg: bgColor, text: { r: textParsed.r, g: textParsed.g, b: textParsed.b } };
+        }
         break;
       }
 
       this.sentenceRectsCache.push(rects);
+      this.sentenceColorsCache.push(colors);
     }
 
     if (this.scrollContainer) {
@@ -209,6 +319,77 @@ export class HighlightManager {
     }
     window.scrollTo(savedX, savedY);
     selection.removeAllRanges();
+  }
+
+  private static readonly MIN_CONTRAST = 4.5;
+  private static readonly MIN_HIGHLIGHT_OPACITY = 0.15;
+
+  /**
+   * Compute a highlight color with opacity adjusted to maintain WCAG AA contrast.
+   * When no color data is cached for the sentence, returns the original highlight color.
+   */
+  private getContrastSafeColor(sentenceIndex: number): string {
+    const colors = this.sentenceColorsCache[sentenceIndex];
+    if (!colors) {
+      return this.highlightColor;
+    }
+
+    const hl = parseColor(this.highlightColor);
+
+    // Check if the chosen opacity already maintains sufficient contrast
+    const effBg = {
+      r: blendChannel(hl.r, colors.bg.r, hl.a),
+      g: blendChannel(hl.g, colors.bg.g, hl.a),
+      b: blendChannel(hl.b, colors.bg.b, hl.a),
+    };
+    const effText = {
+      r: blendChannel(hl.r, colors.text.r, hl.a),
+      g: blendChannel(hl.g, colors.text.g, hl.a),
+      b: blendChannel(hl.b, colors.text.b, hl.a),
+    };
+
+    const ratio = contrastRatio(
+      relativeLuminance(effBg.r, effBg.g, effBg.b),
+      relativeLuminance(effText.r, effText.g, effText.b)
+    );
+
+    if (ratio >= HighlightManager.MIN_CONTRAST) {
+      return this.highlightColor;
+    }
+
+    // Binary search for max opacity that keeps contrast >= 4.5:1
+    let lo = HighlightManager.MIN_HIGHLIGHT_OPACITY;
+    let hi = hl.a;
+    let best = lo;
+
+    for (let i = 0; i < 16; i++) {
+      const mid = (lo + hi) / 2;
+      const midBg = {
+        r: blendChannel(hl.r, colors.bg.r, mid),
+        g: blendChannel(hl.g, colors.bg.g, mid),
+        b: blendChannel(hl.b, colors.bg.b, mid),
+      };
+      const midText = {
+        r: blendChannel(hl.r, colors.text.r, mid),
+        g: blendChannel(hl.g, colors.text.g, mid),
+        b: blendChannel(hl.b, colors.text.b, mid),
+      };
+      const midRatio = contrastRatio(
+        relativeLuminance(midBg.r, midBg.g, midBg.b),
+        relativeLuminance(midText.r, midText.g, midText.b)
+      );
+
+      if (midRatio >= HighlightManager.MIN_CONTRAST) {
+        best = mid;
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+
+    // Floor to 2 decimal places so rounding never increases opacity above what the search validated
+    const safeOpacity = Math.floor(best * 100) / 100;
+    return `rgba(${Math.round(hl.r)}, ${Math.round(hl.g)}, ${Math.round(hl.b)}, ${safeOpacity})`;
   }
 
   /** Apply highlight boxes for a sentence using cached absolute document coords. */
@@ -222,6 +403,8 @@ export class HighlightManager {
     const rects = this.sentenceRectsCache[index];
     if (!rects) {return;}
 
+    const color = this.getContrastSafeColor(index);
+
     for (const r of rects) {
       const box = document.createElement("div");
       box.style.cssText = `
@@ -230,7 +413,7 @@ export class HighlightManager {
         top: ${r.y}px;
         width: ${r.width}px;
         height: ${r.height}px;
-        background-color: ${this.highlightColor};
+        background-color: ${color};
         border-radius: 3px;
         pointer-events: none;
       `;
@@ -285,6 +468,8 @@ export class HighlightManager {
     this.currentHighlightBoxes = [];
     this.currentHighlightIndex = index;
 
+    const color = this.getContrastSafeColor(index);
+
     for (const r of rects) {
       const box = document.createElement("div");
       box.style.cssText = `
@@ -293,7 +478,7 @@ export class HighlightManager {
         top: ${r.y}px;
         width: ${r.width}px;
         height: ${r.height}px;
-        background-color: ${this.highlightColor};
+        background-color: ${color};
         border-radius: 3px;
         pointer-events: none;
         animation: unmute-pulse-opacity 1.5s ease-in-out infinite;
@@ -350,6 +535,7 @@ export class HighlightManager {
     }
     this.currentHighlightBoxes = [];
     this.sentenceRectsCache = [];
+    this.sentenceColorsCache = [];
     this.currentHighlightIndex = -1;
     this.sentences = [];
     this.scrollContainer = null;
