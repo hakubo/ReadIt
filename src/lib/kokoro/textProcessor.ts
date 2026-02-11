@@ -20,16 +20,15 @@ export type TextProcessorChunk = TextChunk | SilenceChunk;
  */
 export function sanitizeText(rawText: string): string {
   const sanitizedText = rawText
-    .replace(/\.\s+/g, "[0.4s]") // Dot followed by whitespace(s).
-    .replace(/,\s+/g, "[0.15s]") // Comma followed by whitespace(s).
-    .replace(/;\s+/g, "[0.4s]") // Semicolon followed by whitespace(s).
-    .replace(/:\s+/g, "[0.3s]") // Colon followed by whitespace(s).
-    .replace(/!\s+/g, "![0.1s]") // Exclamation mark followed by whitespace(s).
-    .replace(/\?\s+/g, "?[0.1s]") // Question mark followed by whitespace(s).
-    .replace(/\n+/g, "[0.4s]")
+    .replace(/\.\s+/g, "[0.2s]") // Dot followed by whitespace(s).
+    .replace(/,\s+/g, "[0.075s]") // Comma followed by whitespace(s).
+    .replace(/;\s+/g, "[0.2s]") // Semicolon followed by whitespace(s).
+    .replace(/:\s+/g, "[0.15s]") // Colon followed by whitespace(s).
+    .replace(/!\s+/g, "![0.05s]") // Exclamation mark followed by whitespace(s).
+    .replace(/\?\s+/g, "?[0.05s]") // Question mark followed by whitespace(s).
+    .replace(/\n+/g, "[0.2s]")
     .trim();
 
-  console.log(sanitizedText);
   return sanitizedText;
 }
 
