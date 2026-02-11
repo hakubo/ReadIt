@@ -24,8 +24,8 @@ export function sanitizeText(rawText: string): string {
     .replace(/,\s+/g, "[0.1s]") // Comma followed by whitespace(s).
     .replace(/;\s+/g, "[0.2s]") // Semicolon followed by whitespace(s).
     .replace(/:\s+/g, "[0.15s]") // Colon followed by whitespace(s).
-    .replace(/!\s+/g, "![0.05s]") // Exclamation mark followed by whitespace(s).
-    .replace(/\?\s+/g, "?[0.05s]") // Question mark followed by whitespace(s).
+    .replace(/!\s+/g, "![0.1s]") // Exclamation mark followed by whitespace(s).
+    .replace(/\?\s+/g, "?[0.1s]") // Question mark followed by whitespace(s).
     .replace(/\n+/g, "[0.2s]")
     .trim();
 
