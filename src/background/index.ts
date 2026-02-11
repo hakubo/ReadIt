@@ -113,27 +113,12 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-// Handle browser icon click — toggle extension on/off for the domain
+// Handle browser icon click — toggle extension on/off for the domain.
+// The content script determines the new state based on actual player visibility
+// and persists the preference, so the background just forwards the signal.
 chrome.action.onClicked.addListener(async (tab) => {
-  if (!tab.id || !tab.url) {return;}
-
-  const tabId = tab.id;
-  let hostname: string;
-  try {
-    hostname = new URL(tab.url).hostname;
-  } catch {
-    return;
-  }
-
-  const key = `site:${hostname}`;
-  const result = await chrome.storage.local.get(key);
-  const prefs = (result[key] as Record<string, unknown> | undefined) ?? {};
-  const wasEnabled = prefs.enabled !== false;
-  const nowEnabled = !wasEnabled;
-
-  await chrome.storage.local.set({ [key]: { ...prefs, enabled: nowEnabled } });
-
-  chrome.tabs.sendMessage(tabId, { type: "EXTENSION_TOGGLE", enabled: nowEnabled }).catch(() => {});
+  if (!tab.id) {return;}
+  chrome.tabs.sendMessage(tab.id, { type: "EXTENSION_TOGGLE" }).catch(() => {});
 });
 
 // Handle context menu click
