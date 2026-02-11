@@ -263,6 +263,79 @@ describe("extractTextFromContainer", () => {
     const text = extractTextFromContainer(container);
     expect(text).toContain("\u202f");
   });
+
+  it("separates paragraphs inside a blockquote with div-based content (Notion)", () => {
+    // Notion wraps blockquote paragraphs in divs, not <p> tags.
+    // Each paragraph must be a separate line so sentence splitting
+    // keeps them apart and window.find() can locate each one.
+    document.body.innerHTML = `
+      <div id="container">
+        <blockquote>
+          <div class="inner">
+            <div class="text-block"><div><div>First paragraph here.</div></div></div>
+            <div class="text-block"><div><div>Second paragraph here.</div></div></div>
+            <div class="text-block"><div><div>Third paragraph here.</div></div></div>
+          </div>
+        </blockquote>
+      </div>
+    `;
+    const container = document.getElementById("container")!;
+    const text = extractTextFromContainer(container);
+    // Paragraphs must be separated by newlines, NOT merged into one line
+    expect(text).toContain("First paragraph here.\nSecond paragraph here.");
+    expect(text.split("\n").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("separates colon-ending line from bullet content in blockquote", () => {
+    // Reproduces the exact Notion blockquote issue: a line ending with ":"
+    // followed by bullet items, all inside a <blockquote> with divs.
+    document.body.innerHTML = `
+      <div id="container">
+        <blockquote>
+          <div class="inner">
+            <div class="para"><div><div>There are a few things that help:</div></div></div>
+            <div class="bullet"><div><div>Check out the Q&amp;A document</div></div></div>
+            <div class="bullet"><div><div>Try the product yourself</div></div></div>
+            <div class="para"><div><div>See you soon!</div></div></div>
+          </div>
+        </blockquote>
+      </div>
+    `;
+    const container = document.getElementById("container")!;
+    const text = extractTextFromContainer(container);
+    const lines = text.split("\n");
+    // The colon line must NOT be merged with the bullet text
+    expect(lines.some(l => l.endsWith("help:"))).toBe(true);
+    expect(lines).toContain("See you soon!");
+  });
+
+  it("handles blockquote with single wrapper div around paragraphs", () => {
+    // Notion blockquote: <blockquote> → single border-div → paragraph divs
+    document.body.innerHTML = `
+      <div id="container">
+        <blockquote>
+          <div style="border-left: 3px solid">
+            <div>Paragraph one content.</div>
+            <div>Paragraph two content.</div>
+          </div>
+        </blockquote>
+      </div>
+    `;
+    const container = document.getElementById("container")!;
+    const text = extractTextFromContainer(container);
+    expect(text).toContain("Paragraph one content.\nParagraph two content.");
+  });
+
+  it("still works with simple blockquotes without nested divs", () => {
+    document.body.innerHTML = `
+      <div id="container">
+        <blockquote>Just a simple quote.</blockquote>
+      </div>
+    `;
+    const container = document.getElementById("container")!;
+    const text = extractTextFromContainer(container);
+    expect(text).toBe("Just a simple quote.");
+  });
 });
 
 describe("detectMainContent", () => {

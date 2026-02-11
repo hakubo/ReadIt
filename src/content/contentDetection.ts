@@ -28,6 +28,44 @@ export function hasNoiseAncestor(el: Element, boundary: Element): boolean {
   return false;
 }
 
+/**
+ * Drill through single-child wrapper elements (e.g. Notion's
+ * blockquote → border-div → paragraph-divs) to reach the element
+ * whose children are actual content blocks.
+ */
+function drillToSingleChild(el: Element, maxDepth = 5): Element {
+  if (maxDepth <= 0) {return el;}
+  const children = Array.from(el.children).filter(c => c instanceof HTMLElement);
+  if (children.length === 1 && children[0].children.length > 0) {
+    return drillToSingleChild(children[0], maxDepth - 1);
+  }
+  return el;
+}
+
+/**
+ * Extract text from a block element, preserving paragraph boundaries.
+ * For elements like blockquotes that contain multiple div children
+ * (Notion wraps paragraphs in divs, not `<p>` tags), drill through
+ * single-child wrappers and extract each child separately with newlines.
+ */
+function extractBlockText(el: Element): string {
+  const inner = drillToSingleChild(el);
+  const children = Array.from(inner.children).filter(
+    c => c instanceof HTMLElement,
+  );
+
+  if (children.length > 1) {
+    const parts: string[] = [];
+    for (const child of children) {
+      const t = (child.textContent || "").trim().replace(ASCII_WS, " ");
+      if (t.length > 0) {parts.push(t);}
+    }
+    if (parts.length > 1) {return parts.join("\n");}
+  }
+
+  return (el.textContent || "").trim().replace(ASCII_WS, " ");
+}
+
 /** Extract readable text from an element's block children. */
 export function extractTextFromContainer(container: Element): string {
   const blocks = container.querySelectorAll(BLOCK_SELECTOR);
@@ -35,7 +73,7 @@ export function extractTextFromContainer(container: Element): string {
   for (const block of blocks) {
     if (hasNoiseAncestor(block, container)) {continue;}
     if (block.querySelector(BLOCK_SELECTOR)) {continue;}
-    const t = (block.textContent || "").trim().replace(ASCII_WS, " ");
+    const t = extractBlockText(block);
     if (t.length > 0) {texts.push(t);}
   }
   const blockText = texts.join("\n");
@@ -52,7 +90,7 @@ export function extractTextFromContainer(container: Element): string {
   for (const child of contentEl.children) {
     if (child instanceof HTMLElement && child.matches(NOISE_SELECTOR)) {continue;}
     if (child instanceof HTMLElement && hasNoiseAncestor(child, contentEl)) {continue;}
-    const t = (child.textContent || "").trim().replace(ASCII_WS, " ");
+    const t = extractBlockText(child);
     if (t.length > 0) {childTexts.push(t);}
   }
 
