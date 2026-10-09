@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, fireEvent, cleanup } from "@testing-library/react";
+import { render, fireEvent, cleanup, act } from "@testing-library/react";
 import { FloatingPlayer } from "../content/FloatingPlayer";
 import { setPlaybackState } from "../content/playerStore";
 
@@ -61,6 +61,17 @@ describe("FloatingPlayer", () => {
   it("renders the player pill", () => {
     const { container } = render(<FloatingPlayer {...defaultProps} />);
     expect(container.querySelector(".kokoro-pill")).toBeInTheDocument();
+  });
+
+  it("keeps the level bars (and so the pill's width) when paused", () => {
+    const playing = { isPlaying: true, currentTime: 5, duration: 30, currentIndex: 0, queueLength: 5 };
+    resetStore({ playerState: playing });
+    const { container, rerender } = render(<FloatingPlayer {...defaultProps} />);
+    expect(container.querySelector(".pill-eq:not(.paused)")).toBeInTheDocument();
+
+    act(() => resetStore({ playerState: { ...playing, isPlaying: false } }));
+    rerender(<FloatingPlayer {...defaultProps} />);
+    expect(container.querySelector(".pill-eq.paused")).toBeInTheDocument();
   });
 
   it("shows speed button with current speed", () => {

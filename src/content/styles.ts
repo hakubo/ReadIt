@@ -133,6 +133,7 @@ export const SHADOW_STYLES = `
   .pill-eq i { flex: 1; border-radius: 1px; background: var(--u-grad); animation: readit-eq 900ms ease-in-out infinite; }
   .pill-eq i:nth-child(2) { animation-delay: -300ms; }
   .pill-eq i:nth-child(3) { animation-delay: -600ms; }
+  .pill-eq.paused i { animation: none; height: 25%; opacity: 0.5; }
   @keyframes readit-eq { 0%, 100% { height: 25%; } 50% { height: 100%; } }
 
   .pill-time {

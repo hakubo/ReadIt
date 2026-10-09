@@ -275,9 +275,8 @@ export function FloatingPlayer({
           )}
         </div>
 
-        {playerState.isPlaying && (
-          <span className="pill-eq" aria-hidden="true"><i /><i /><i /></span>
-        )}
+        {/* Always rendered so the pill keeps its width (the settings panel is aligned to its right edge); bars rest while paused */}
+        <span className={`pill-eq${playerState.isPlaying ? "" : " paused"}`} aria-hidden="true"><i /><i /><i /></span>
 
         {/* Time: elapsed / total, or the last generation error */}
         {error ? (
