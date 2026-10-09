@@ -1,0 +1,42 @@
+Third-party software and data
+=============================
+
+This extension bundles or downloads the following. Full license texts are
+linked below; the GPL-3.0 text is included in licenses/GPL-3.0.txt.
+
+
+espeak-ng (bundled as espeak-ng.wasm)
+  License: GNU General Public License v3.0 or later (licenses/GPL-3.0.txt)
+  Used to turn text into phonemes. espeak-ng.wasm is distributed unmodified
+  from the espeak-ng npm package, version 1.0.2.
+  Source code: https://github.com/espeak-ng/espeak-ng
+               https://www.npmjs.com/package/espeak-ng/v/1.0.2
+
+ONNX Runtime Web (bundled: ort-wasm-*.wasm, ort-wasm-*.mjs, JavaScript)
+  Copyright (c) Microsoft Corporation. License: MIT
+  https://github.com/microsoft/onnxruntime/blob/main/LICENSE
+
+Kokoro-82M speech model and voices (downloaded on first use, not bundled)
+  Copyright (c) hexgrad. License: Apache License 2.0
+  https://huggingface.co/hexgrad/Kokoro-82M
+  ONNX export: https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX
+
+kokoro-web (parts of the model loading and voice code are adapted from it)
+  Copyright (c) Eduardo Lat. License: MIT
+  https://github.com/eduardolat/kokoro-web
+
+React and React DOM
+  Copyright (c) Meta Platforms, Inc. and affiliates. License: MIT
+  https://github.com/facebook/react/blob/main/LICENSE
+
+Lucide icons (lucide-react)
+  Copyright (c) Lucide Contributors. License: ISC
+  https://github.com/lucide-icons/lucide/blob/main/LICENSE
+
+Zod
+  Copyright (c) Colin McDonnell. License: MIT
+  https://github.com/colinhacks/zod/blob/main/LICENSE
+
+wavefile
+  Copyright (c) Rafael da Silva Rocha. License: MIT
+  https://github.com/rochars/wavefile/blob/master/LICENSE

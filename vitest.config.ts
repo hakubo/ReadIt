@@ -1,0 +1,18 @@
+import { defineConfig } from "vitest/config";
+import { resolve } from "path";
+
+export default defineConfig({
+  define: {
+    __DEBUG_TOOLS__: "true",
+  },
+  resolve: {
+    alias: {
+      "@": resolve(__dirname, "./src"),
+    },
+  },
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./src/__tests__/setup.ts"],
+    include: ["src/**/*.test.{ts,tsx}"],
+  },
+});

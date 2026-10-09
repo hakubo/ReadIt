@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Read it! — Free, local text-to-speech voice reader</title>
+  <meta name="description" content="A Chrome extension that adds text-to-speech to any webpage. Select text, click Read, and listen. 100% private, runs locally.">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #111827;
+      color: #fff;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 80px 24px 64px;
+    }
+
+    .hero-logo {
+      width: 96px;
+      height: 96px;
+      margin: 0 auto 24px;
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .hero-logo svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .hero .tagline {
+      font-size: 1.25rem;
+      color: #9ca3af;
+      max-width: 480px;
+      margin: 0 auto 32px;
+    }
+
+    .cta-button {
+      display: inline-block;
+      background: #3b82f6;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 14px 32px;
+      border-radius: 10px;
+      transition: background 0.2s;
+    }
+
+    .cta-button:hover {
+      background: #2563eb;
+      text-decoration: none;
+    }
+
+    /* Sections */
+    section {
+      padding: 64px 0;
+    }
+
+    .section-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 48px;
+      letter-spacing: -0.01em;
+    }
+
+    /* How it works */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+    }
+
+    .step {
+      text-align: center;
+      padding: 32px 16px;
+      background: #1f2937;
+      border-radius: 12px;
+    }
+
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      background: #3b82f6;
+      border-radius: 50%;
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .step h3 {
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+    }
+
+    .step p {
+      color: #9ca3af;
+      font-size: 0.95rem;
+    }
+
+    /* Benefits */
+    .benefits {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    .benefit {
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 32px;
+    }
+
+    .benefit-icon {
+      font-size: 1.75rem;
+      margin-bottom: 12px;
+    }
+
+    .benefit h3 {
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+    }
+
+    .benefit p {
+      color: #9ca3af;
+      font-size: 0.95rem;
+    }
+
+    /* Requirements */
+    .requirements {
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 40px;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    .requirements ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .requirements li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      color: #d1d5db;
+      font-size: 0.95rem;
+    }
+
+    .requirements li::before {
+      content: "→";
+      color: #3b82f6;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid #1f2937;
+      padding: 40px 0;
+      text-align: center;
+    }
+
+    .footer-links {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .coffee-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #40DCA5;
+      color: #000;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      transition: opacity 0.2s;
+    }
+
+    .coffee-button:hover {
+      opacity: 0.9;
+      text-decoration: none;
+    }
+
+    .github-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #9ca3af;
+      font-size: 0.95rem;
+    }
+
+    .github-link:hover {
+      color: #fff;
+      text-decoration: none;
+    }
+
+    .github-link svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero {
+        padding: 56px 24px 48px;
+      }
+
+      .hero h1 {
+        font-size: 2rem;
+      }
+
+      .hero .tagline {
+        font-size: 1.1rem;
+      }
+
+      .steps {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+
+      .benefits {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+
+      .section-title {
+        font-size: 1.5rem;
+        margin-bottom: 32px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="container">
+      <div class="hero-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+          <defs>
+            <clipPath id="rounded">
+              <rect width="512" height="512" rx="40" ry="40"/>
+            </clipPath>
+          </defs>
+          <g clip-path="url(#rounded)">
+            <rect width="512" height="512" fill="#FFFFFF"/>
+            <path d="M 0 0 H 422 L 512 90 V 512 H 0 Z" fill="#F5F2EB"/>
+            <path d="M 422 0 L 512 90 H 452 Q 422 90 422 60 Z" fill="#EBE5D5"/>
+            <line x1="422" y1="0" x2="512" y2="90" stroke="#C5BFB0" stroke-width="1" opacity="0.35"/>
+            <line x1="56" y1="112" x2="456" y2="112" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="192" x2="456" y2="192" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="272" x2="456" y2="272" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="352" x2="456" y2="352" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <line x1="56" y1="432" x2="456" y2="432" stroke="#E8E2D2" stroke-width="3" stroke-linecap="round"/>
+            <rect x="44"  y="248" width="9" height="24"  rx="4.5" fill="#1A3D2E"/>
+            <rect x="74"  y="220" width="9" height="80"  rx="4.5" fill="#1F432F"/>
+            <rect x="104" y="186" width="9" height="148" rx="4.5" fill="#254932"/>
+            <rect x="134" y="168" width="9" height="184" rx="4.5" fill="#2D5134"/>
+            <rect x="164" y="238" width="9" height="44"  rx="4.5" fill="#365534"/>
+            <rect x="194" y="200" width="9" height="120" rx="4.5" fill="#415932"/>
+            <rect x="224" y="178" width="9" height="164" rx="4.5" fill="#4E5A2F"/>
+            <rect x="254" y="163" width="9" height="194" rx="4.5" fill="#5C5A2B"/>
+            <rect x="284" y="135" width="9" height="250" rx="4.5" fill="#6B5726"/>
+            <rect x="314" y="143" width="9" height="234" rx="4.5" fill="#775224"/>
+            <rect x="344" y="193" width="9" height="134" rx="4.5" fill="#7D4C27"/>
+            <rect x="374" y="233" width="9" height="54"  rx="4.5" fill="#79432A"/>
+            <rect x="404" y="173" width="9" height="174" rx="4.5" fill="#6C3A27"/>
+            <rect x="434" y="208" width="9" height="104" rx="4.5" fill="#5D3122"/>
+            <rect x="464" y="248" width="9" height="24"  rx="4.5" fill="#50291D"/>
+          </g>
+        </svg>
+      </div>
+      <h1>Read it!</h1>
+      <p class="tagline">Select text on any page and listen to it with AI voice</p>
+      <a href="#install" class="cta-button">Install for Chrome</a>
+    </div>
+  </header>
+
+  <!-- How it works -->
+  <section>
+    <div class="container">
+      <h2 class="section-title">How it works</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <h3>Select text</h3>
+          <p>Highlight any text on any webpage</p>
+        </div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <h3>Click "Read"</h3>
+          <p>A button appears next to your selection</p>
+        </div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <h3>Listen</h3>
+          <p>Natural AI voice reads the text aloud</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Key benefits -->
+  <section>
+    <div class="container">
+      <h2 class="section-title">Why Read it!?</h2>
+      <div class="benefits">
+        <div class="benefit">
+          <div class="benefit-icon">🔒</div>
+          <h3>100% Private</h3>
+          <p>Your text never leaves your browser. No servers, no APIs, no tracking.</p>
+        </div>
+        <div class="benefit">
+          <div class="benefit-icon">💻</div>
+          <h3>Runs Locally</h3>
+          <p>The AI model runs entirely on your device using WebGPU or WASM.</p>
+        </div>
+        <div class="benefit">
+          <div class="benefit-icon">🆓</div>
+          <h3>Free &amp; Open Source</h3>
+          <p>No subscriptions, no limits, no accounts required.</p>
+        </div>
+        <div class="benefit">
+          <div class="benefit-icon">🎙️</div>
+          <h3>Natural Voices</h3>
+          <p>Multiple high-quality voices across languages, powered by Kokoro TTS.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- System requirements -->
+  <section id="install">
+    <div class="container">
+      <h2 class="section-title">System requirements</h2>
+      <div class="requirements">
+        <ul>
+          <li>Chrome 113+ with WebGPU support (or any Chromium-based browser)</li>
+          <li>~500 MB RAM for the TTS model</li>
+          <li>Works best with a dedicated GPU, but CPU mode is also supported</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="https://buymeacoffee.com/jakubolek" class="coffee-button" target="_blank" rel="noopener">
+          ☕ Buy me a coffee
+        </a>
+        <a href="https://github.com/eduardolat/kokoro-web" class="github-link" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Read it! – Free Local Text to Speech Voice Reader",
+  "short_name": "Read it!",
+  "version": "0.2.0",
+  "description": "Listen to any web page with natural AI voices that run entirely in your browser. Free and private.",
+  "icons": {
+    "16": "icons/logo3-small-16.png",
+    "48": "icons/logo3-small-48.png",
+    "128": "icons/logo3-128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/logo3-small-16.png",
+      "48": "icons/logo3-small-48.png"
+    }
+  },
+  "permissions": ["storage", "offscreen", "contextMenus", "power", "alarms"],
+  "host_permissions": [
+    "https://huggingface.co/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["player.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
