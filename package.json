@@ -1,6 +1,6 @@
 {
   "name": "read-it",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc && vite build && BUILD_TARGET=content vite build && BUILD_TARGET=offscreen vite build && cp public/manifest.json dist/ && cp public/player.html dist/ && cp public/player.js dist/ && cp node_modules/onnxruntime-web/dist/ort.webgpu.bundle.min.mjs dist/ && cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm dist/ && cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs dist/ && cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm dist/ && cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.mjs dist/ && cp node_modules/espeak-ng/dist/espeak-ng.wasm dist/",
     "build:release": "READIT_RELEASE=1 npm run build",
+    "bump": "npm version ${BUMP:-patch} --no-git-tag-version && node scripts/sync-manifest-version.mjs",
     "preview": "vite preview",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",

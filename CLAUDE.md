@@ -208,6 +208,8 @@ Per-domain overrides stored in `chrome.storage.local` (key: `"site:{hostname}"`)
 
 ## Chrome Web Store
 
+- **Every change bumps the version.** Run `npm run bump` (patch; `BUMP=minor npm run bump` for features) before committing: it updates `package.json`, `package-lock.json` and `public/manifest.json` together. Then tag the commit `v<version>` and push the tag, so each uploaded build maps to its source.
+
 - Product name is **Read it!** (`manifest.json` name/short_name, UI strings, log prefix `[Read it!]`). The old name unmute.page was dropped (domain not owned). Element ids, keyframes and the release env var use the `readit-` / `READIT_` prefix.
 - No superlatives ("best", "#1") in the Store name or description: misleading-metadata policy.
 
