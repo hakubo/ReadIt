@@ -1,8 +1,14 @@
 Third-party software and data
 =============================
 
+Read it! is MIT-licensed (Copyright (c) 2026 Jakub Olek). Its source code,
+for every published version (tagged by version number), is at
+https://github.com/hakubo/ReadIt
+
 This extension bundles or downloads the following. Full license texts are
-linked below; the GPL-3.0 text is included in licenses/GPL-3.0.txt.
+linked below; the GPL-3.0 and Apache-2.0 texts are included in licenses/.
+Because espeak-ng is GPL-3.0, the extension package as a whole is
+distributed under the terms of the GPL-3.0.
 
 
 espeak-ng (bundled as espeak-ng.wasm)
@@ -15,6 +21,14 @@ espeak-ng (bundled as espeak-ng.wasm)
 ONNX Runtime Web (bundled: ort-wasm-*.wasm, ort-wasm-*.mjs, JavaScript)
   Copyright (c) Microsoft Corporation. License: MIT
   https://github.com/microsoft/onnxruntime/blob/main/LICENSE
+  Including its dependencies:
+    onnxruntime-common - Copyright (c) Microsoft Corporation. MIT
+    flatbuffers - Copyright (c) Google Inc. Apache License 2.0 (licenses/Apache-2.0.txt)
+    long - Copyright (c) Daniel Wirtz. Apache License 2.0 (licenses/Apache-2.0.txt)
+    protobufjs and @protobufjs/* - Copyright (c) Daniel Wirtz. BSD-3-Clause
+      https://github.com/protobufjs/protobuf.js/blob/master/LICENSE
+    platform - Copyright (c) John-David Dalton. MIT
+    guid-typescript - Copyright (c) Nicolas Dupuis. ISC
 
 Kokoro-82M speech model and voices (downloaded on first use, not bundled)
   Copyright (c) hexgrad. License: Apache License 2.0
@@ -22,15 +36,16 @@ Kokoro-82M speech model and voices (downloaded on first use, not bundled)
   ONNX export: https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX
 
 kokoro-web (parts of the model loading and voice code are adapted from it)
-  Copyright (c) Eduardo Lat. License: MIT
+  Copyright (c) 2025 Luis Eduardo. License: MIT
   https://github.com/eduardolat/kokoro-web
 
-React and React DOM
+React, React DOM and scheduler
   Copyright (c) Meta Platforms, Inc. and affiliates. License: MIT
   https://github.com/facebook/react/blob/main/LICENSE
 
 Lucide icons (lucide-react)
-  Copyright (c) Lucide Contributors. License: ISC
+  Copyright (c) 2026 Lucide Icons and Contributors. License: ISC
+  Icons derived from Feather: Copyright (c) 2013-present Cole Bemis. License: MIT
   https://github.com/lucide-icons/lucide/blob/main/LICENSE
 
 Zod

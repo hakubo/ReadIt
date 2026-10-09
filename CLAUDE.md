@@ -214,7 +214,7 @@ Per-domain overrides stored in `chrome.storage.local` (key: `"site:{hostname}"`)
 - Upload only `npm run build:release` output (`dist/`); plain `build` ships the debug panel.
 - Keep permissions minimal: no `activeTab`, no `<all_urls>` host permission (the content script's own `matches` injects it), only `huggingface.co` for model/voice data. `web_accessible_resources` is just `player.html` (anything listed there lets sites detect the extension).
 - No remote code: ONNX Runtime and espeak WASM are always loaded from the extension (no CDN fallback).
-- `public/THIRD_PARTY_NOTICES.txt` and `public/licenses/GPL-3.0.txt` ship in the package: espeak-ng is GPL-3.0, so its license text and source links must stay. Update the notices when adding a dependency.
+- `public/THIRD_PARTY_NOTICES.txt` and `public/licenses/GPL-3.0.txt` ship in the package: espeak-ng is GPL-3.0, so its license text and source links must stay. Update the notices when adding a dependency (including transitive ones that get bundled). Tag each Store release (`v0.2.0`, …) so every published version maps to its source, which GPL requires; the repo must be public (or a written source offer included) once the extension is published.
 - No `console.log` in the content script: page consoles belong to the site.
 
 ## Build Outputs
