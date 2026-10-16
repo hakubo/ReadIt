@@ -104,6 +104,8 @@ export const SENTENCE_PAUSE_MS = 150;
 
 export interface SitePrefs {
   playerPosition?: { x: number; y: number };
+  /** Player collapsed to just the play button and an expand button. */
+  playerMinimized?: boolean;
   enabled?: boolean;
   settings?: TTSSettings;
   contentSelector?: string;

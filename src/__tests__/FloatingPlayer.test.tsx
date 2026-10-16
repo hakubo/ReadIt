@@ -5,7 +5,9 @@ import { setPlaybackState } from "../content/playerStore";
 
 // Mock SettingsPanel to avoid its chrome.runtime dependencies
 vi.mock("../content/SettingsPanel", () => ({
-  SettingsPanel: () => <div data-testid="settings-panel" />,
+  SettingsPanel: ({ position }: { position: { x: number; y: number } }) => (
+    <div data-testid="settings-panel" data-x={position.x} data-y={position.y} />
+  ),
 }));
 
 afterEach(cleanup);
@@ -18,6 +20,7 @@ const defaultProps = {
   onClose: vi.fn(),
   onSettingsOpened: vi.fn(),
   onPositionChange: vi.fn(),
+  onMinimizedChange: vi.fn(),
   onPickContent: vi.fn(),
   onClearContentSelector: vi.fn(),
   onSetContentSelector: vi.fn(),
@@ -179,6 +182,76 @@ describe("FloatingPlayer", () => {
     const cogBtn = container.querySelector(".pill-cog")!;
     fireEvent.click(cogBtn);
     expect(cogBtn.className).toContain("active");
+  });
+
+  it("keeps the settings panel in place when playback starts", () => {
+    const { container, rerender } = render(
+      <FloatingPlayer {...defaultProps} initialPosition={{ x: 100, y: 20 }} />,
+    );
+    fireEvent.click(container.querySelector(".pill-cog")!);
+    const panel = () => container.querySelector("[data-testid=settings-panel]")!;
+    const before = { x: panel().getAttribute("data-x"), y: panel().getAttribute("data-y") };
+    expect(before).toEqual({ x: "100", y: "76" });
+
+    // Playing adds the Stop button and changes the time text, so the pill gets wider
+    act(() => resetStore({
+      loading: true,
+      playerState: { isPlaying: true, currentTime: 5, duration: 30, currentIndex: 0, queueLength: 5 },
+      totalElapsedTime: 5,
+      totalEstimatedDuration: 600,
+    }));
+    rerender(<FloatingPlayer {...defaultProps} initialPosition={{ x: 100, y: 20 }} />);
+    expect(container.querySelector(".pill-close")).toBeInTheDocument();
+    expect({ x: panel().getAttribute("data-x"), y: panel().getAttribute("data-y") }).toEqual(before);
+  });
+
+  it("minimizes to the play button and expands back", () => {
+    const { container } = render(<FloatingPlayer {...defaultProps} />);
+    fireEvent.click(container.querySelector(".pill-cog")!);
+    fireEvent.click(container.querySelector(".pill-minimize")!);
+
+    expect(container.querySelector(".pill-minimized")).toBeInTheDocument();
+    expect(container.querySelector(".pill-play-btn")).toBeInTheDocument();
+    expect(container.querySelector(".pill-speed")).not.toBeInTheDocument();
+    expect(container.querySelector(".pill-cog")).not.toBeInTheDocument();
+    expect(defaultProps.onMinimizedChange).toHaveBeenLastCalledWith(true);
+
+    fireEvent.click(container.querySelector(".pill-expand")!);
+    expect(container.querySelector(".pill-minimized")).not.toBeInTheDocument();
+    expect(container.querySelector(".pill-speed")).toBeInTheDocument();
+    // Minimizing closed the settings panel; expanding doesn't reopen it
+    expect(container.querySelector(".pill-cog")!.className).not.toContain("active");
+    expect(defaultProps.onMinimizedChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("starts minimized when the site saved it that way", () => {
+    const { container } = render(<FloatingPlayer {...defaultProps} initialMinimized />);
+    expect(container.querySelector(".pill-expand")).toBeInTheDocument();
+    expect(defaultProps.onMinimizedChange).not.toHaveBeenCalled();
+  });
+
+  it("expands when settings are opened from the context menu", () => {
+    const { container, rerender } = render(<FloatingPlayer {...defaultProps} initialMinimized />);
+    act(() => resetStore({ forceSettingsOpen: true }));
+    rerender(<FloatingPlayer {...defaultProps} initialMinimized />);
+    expect(container.querySelector(".pill-cog")!.className).toContain("active");
+  });
+
+  it("closes the settings panel where it was when minimizing", () => {
+    const { container } = render(
+      <FloatingPlayer {...defaultProps} initialPosition={{ x: 100, y: 20 }} />,
+    );
+    fireEvent.click(container.querySelector(".pill-cog")!);
+    const panel = () => container.querySelector("[data-testid=settings-panel]")!;
+    const before = { x: panel().getAttribute("data-x"), y: panel().getAttribute("data-y") };
+
+    // Pinning the pill's right edge moves its left edge (and so `position.x`)
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+      { left: 900, right: 1200, top: 20, bottom: 68, width: 300, height: 48 } as DOMRect,
+    );
+    fireEvent.click(container.querySelector(".pill-minimize")!);
+    vi.restoreAllMocks();
+    expect({ x: panel().getAttribute("data-x"), y: panel().getAttribute("data-y") }).toEqual(before);
   });
 
   it("shows download progress when downloading", () => {

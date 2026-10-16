@@ -97,6 +97,7 @@ export const SHADOW_STYLES = `
     transition: box-shadow 400ms var(--u-ease), border-color 400ms;
   }
   .kokoro-pill:active { cursor: grabbing; }
+  .kokoro-pill.pill-minimized { gap: 2px; padding-right: 5px; }
   .kokoro-pill.pill-playing {
     border-color: rgba(139, 92, 246, 0.35);
     box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.08), 0 10px 32px -8px rgba(139, 92, 246, 0.45), var(--u-shadow);

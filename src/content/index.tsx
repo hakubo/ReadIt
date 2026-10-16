@@ -521,6 +521,11 @@ function handlePositionChangeCallback(pos: { x: number; y: number }) {
   saveSitePrefs({ playerPosition: pos });
 }
 
+function handleMinimizedChangeCallback(minimized: boolean) {
+  if (!ensureExtensionContext()) {return;}
+  saveSitePrefs({ playerMinimized: minimized });
+}
+
 function handleClearContentSelectorCallback() {
   saveSitePrefs({ contentSelector: undefined });
   elementPicker.hideSelectorPreview();
@@ -690,6 +695,8 @@ function showPlayer() {
         onSettingsOpened={handleSettingsOpenedCallback}
         initialPosition={sitePrefs.playerPosition}
         onPositionChange={handlePositionChangeCallback}
+        initialMinimized={sitePrefs.playerMinimized}
+        onMinimizedChange={handleMinimizedChangeCallback}
         onPickContent={handlePickContent}
         onClearContentSelector={handleClearContentSelectorCallback}
         onSetContentSelector={handleSetContentSelectorCallback}

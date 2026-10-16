@@ -202,6 +202,7 @@ Global TTS settings stored in `chrome.storage.sync` (key: `"settings"`):
 Per-domain overrides stored in `chrome.storage.local` (key: `"site:{hostname}"`):
 
 - `playerPosition` - Floating player position
+- `playerMinimized` - Player collapsed to the play button + expand button (pill resize animates, keeping the edge nearer the screen side)
 - `enabled` - Extension on/off for this domain
 - `settings` - TTSSettings override
 - `contentSelector` - CSS selector for main content area

@@ -1,5 +1,5 @@
-import { memo, useEffect, useRef, useState } from "react";
-import { Play, Pause, X, RotateCcw, Settings } from "lucide-react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Play, Pause, X, RotateCcw, Settings, Minimize2, Maximize2 } from "lucide-react";
 import { SettingsPanel } from "./SettingsPanel";
 import { usePlaybackStore } from "./playerStore";
 
@@ -22,6 +22,8 @@ interface FloatingPlayerProps {
   onSettingsOpened: () => void;
   initialPosition?: { x: number; y: number };
   onPositionChange: (pos: { x: number; y: number }) => void;
+  initialMinimized?: boolean;
+  onMinimizedChange: (minimized: boolean) => void;
   onPickContent: () => void;
   onClearContentSelector: () => void;
   onSetContentSelector: (selector: string) => void;
@@ -35,8 +37,10 @@ interface FloatingPlayerProps {
 
 const SPEED_OPTIONS = [0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2];
 
-// Must match .settings-panel width in styles.ts (the panel is right-aligned to the pill)
+// Must match .settings-panel width and .kokoro-pill height (+ borders) in styles.ts
 const SETTINGS_PANEL_WIDTH = 300;
+const PILL_HEIGHT = 48;
+const SETTINGS_PANEL_GAP = 8;
 
 // SVG progress ring constants (sized for horizontal bar)
 const RING_RADIUS = 14;
@@ -49,6 +53,36 @@ function clampToViewport(pos: { x: number; y: number }, el: HTMLElement | null) 
     x: Math.max(0, Math.min(pos.x, window.innerWidth - w)),
     y: Math.max(0, Math.min(pos.y, window.innerHeight - h)),
   };
+}
+
+const RESIZE_ANIMATION_MS = 180;
+
+/**
+ * Grows/shrinks the pill from its old box to its new one. React has already rendered the
+ * new controls, so the pill is pinned back to the old width and left edge, then
+ * transitioned; the caller's next render moves `left` to the new position, which the
+ * transition picks up too. Inline transitions still yield to the reduced-motion rule.
+ */
+function animatePillResize(
+  pill: HTMLElement,
+  before: DOMRect,
+  timer: { current: ReturnType<typeof setTimeout> | undefined },
+) {
+  clearTimeout(timer.current);
+  pill.style.transition = "none";
+  pill.style.width = "";
+  const newWidth = pill.offsetWidth;
+  pill.style.overflow = "hidden";
+  pill.style.width = `${before.width}px`;
+  pill.style.left = `${before.left}px`;
+  void pill.offsetWidth; // Commit the old box so the transition starts from it
+  pill.style.transition = `width ${RESIZE_ANIMATION_MS}ms var(--u-ease), left ${RESIZE_ANIMATION_MS}ms var(--u-ease)`;
+  pill.style.width = `${newWidth}px`;
+  timer.current = setTimeout(() => {
+    pill.style.transition = "";
+    pill.style.width = "";
+    pill.style.overflow = "";
+  }, RESIZE_ANIMATION_MS + 20);
 }
 
 /** Violet → sky gradient for the progress ring (ids are scoped to the player's shadow root). */
@@ -93,6 +127,8 @@ export function FloatingPlayer({
   onSettingsOpened,
   initialPosition,
   onPositionChange,
+  initialMinimized = false,
+  onMinimizedChange,
   onPickContent,
   onClearContentSelector,
   onSetContentSelector,
@@ -126,15 +162,60 @@ export function FloatingPlayer({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Where the panel was when it closed: it fades out there instead of following the pill
+  // (minimizing a right-docked pill moves its left edge mid-fade).
+  const [closedPanelPos, setClosedPanelPos] = useState<{ x: number; y: number } | null>(null);
+  const [minimized, setMinimized] = useState(initialMinimized);
 
-  useEffect(() => {
-    if (forceSettingsOpen && !settingsOpen) {
+  // Open on request (context menu / toolbar icon). Derived during render rather than in an
+  // effect so the request shows in the same frame; the effect only acknowledges it.
+  // A minimized pill has no cog, so the request expands it too.
+  const [previousForceSettingsOpen, setPreviousForceSettingsOpen] = useState(forceSettingsOpen);
+  if (forceSettingsOpen !== previousForceSettingsOpen) {
+    setPreviousForceSettingsOpen(forceSettingsOpen);
+    if (forceSettingsOpen) {
       setSettingsOpen(true);
+      setMinimized(false);
+    }
+  }
+  useEffect(() => {
+    if (forceSettingsOpen) {
       onSettingsOpened();
     }
   }, [forceSettingsOpen]);
 
   const playerRef = useRef<HTMLDivElement>(null);
+
+  // Pill rect just before a minimize/expand, so the new width can keep the edge nearest
+  // the screen side where it sits (a pill docked on the right shrinks towards the right).
+  const rectBeforeResize = useRef<DOMRect | null>(null);
+  const isFirstMinimizedRender = useRef(true);
+  const resizeAnimationTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(resizeAnimationTimer.current), []);
+  useLayoutEffect(() => {
+    if (isFirstMinimizedRender.current) {
+      isFirstMinimizedRender.current = false;
+      return;
+    }
+    const before = rectBeforeResize.current;
+    rectBeforeResize.current = null;
+    const pill = playerRef.current;
+    const keepsRightEdge = before && before.left + before.width / 2 > window.innerWidth / 2;
+    const x = before && pill && keepsRightEdge ? before.right - pill.offsetWidth : position.x;
+    const next = clampToViewport({ x, y: position.y }, pill);
+    if (pill && before) {
+      animatePillResize(pill, before, resizeAnimationTimer);
+    }
+    setPosition(next);
+    onPositionChange(next);
+    onMinimizedChange(minimized);
+  }, [minimized]);
+
+  const handleMinimizedToggle = () => {
+    rectBeforeResize.current = playerRef.current?.getBoundingClientRect() ?? null;
+    closeSettings();
+    setMinimized(!minimized);
+  };
 
   const handleSpeedCycle = () => {
     const currentIdx = SPEED_OPTIONS.indexOf(speed);
@@ -226,23 +307,30 @@ export function FloatingPlayer({
       ? Math.min(totalElapsedTime / totalEstimatedDuration, 1)
       : 0;
 
-  // Settings panel positioned below the pill, right-aligned
-  // eslint-disable-next-line react-hooks/refs -- intentional: read ref for layout positioning
-  const pillRect = playerRef.current?.getBoundingClientRect();
-  const settingsPanelPos = pillRect
-    ? { x: Math.max(8, pillRect.right - SETTINGS_PANEL_WIDTH), y: pillRect.bottom + 8 }
-    : { x: position.x, y: position.y + 48 };
+  // Settings panel below the pill, anchored to its left edge. `position` only changes on
+  // drag/resize, so the panel stays put while the pill's width changes (the Stop button
+  // appears on play, the time estimate loses its "~", digits grow). Anchoring to the pill's
+  // measured right edge made the panel jump with every one of those.
+  const settingsPanelPos = {
+    x: Math.max(SETTINGS_PANEL_GAP, Math.min(position.x, window.innerWidth - SETTINGS_PANEL_WIDTH - SETTINGS_PANEL_GAP)),
+    y: position.y + PILL_HEIGHT + SETTINGS_PANEL_GAP,
+  };
 
-  const handleSettingsClose = () => setSettingsOpen(false);
-  const handleSettingsToggle = () => setSettingsOpen(!settingsOpen);
-  const handlePickContent = () => { setSettingsOpen(false); onPickContent(); };
-  const handlePickNoise = () => { setSettingsOpen(false); onPickNoise(); };
+  function closeSettings() {
+    if (settingsOpen) {
+      setClosedPanelPos(settingsPanelPos);
+    }
+    setSettingsOpen(false);
+  }
+  const handleSettingsToggle = () => (settingsOpen ? closeSettings() : setSettingsOpen(true));
+  const handlePickContent = () => { closeSettings(); onPickContent(); };
+  const handlePickNoise = () => { closeSettings(); onPickNoise(); };
 
   return (
     <>
       <div
         ref={playerRef}
-        className={`kokoro-pill${playerState.isPlaying ? " pill-playing" : ""}${theme === "light" ? " theme-light" : ""}`}
+        className={`kokoro-pill${playerState.isPlaying ? " pill-playing" : ""}${minimized ? " pill-minimized" : ""}${theme === "light" ? " theme-light" : ""}`}
         style={{
           position: "fixed",
           zIndex: 2147483647,
@@ -275,6 +363,12 @@ export function FloatingPlayer({
           )}
         </div>
 
+        {minimized ? (
+          <button className="pill-icon-btn pill-expand" onClick={handleMinimizedToggle} title="Expand player">
+            <Maximize2 size={13} />
+          </button>
+        ) : (
+        <>
         {/* Always rendered so the pill keeps its width (the settings panel is aligned to its right edge); bars rest while paused */}
         <span className={`pill-eq${playerState.isPlaying ? "" : " paused"}`} aria-hidden="true"><i /><i /><i /></span>
 
@@ -312,6 +406,10 @@ export function FloatingPlayer({
           <Settings size={14} />
         </button>
 
+        <button className="pill-icon-btn pill-minimize" onClick={handleMinimizedToggle} title="Minimize player">
+          <Minimize2 size={13} />
+        </button>
+
         {/* Buy Me a Coffee */}
         <a
           className="pill-bmc"
@@ -331,11 +429,13 @@ export function FloatingPlayer({
             <X size={12} strokeWidth={3} />
           </button>
         )}
+        </>
+        )}
       </div>
 
       <MemoizedSettingsPanel
-        position={settingsPanelPos}
-        onClose={handleSettingsClose}
+        position={settingsOpen ? settingsPanelPos : (closedPanelPos ?? settingsPanelPos)}
+        onClose={closeSettings}
         domain={domain}
         theme={theme}
         visible={settingsOpen}
