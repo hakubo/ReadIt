@@ -32,7 +32,7 @@ const reader = new DemoReader(article, (requested, used) => {
     return;
   }
   lastSubstitutionNotice = requested;
-  showToast(`This demo has four recorded voices, so ${voiceName(used)} stands in for ${voiceName(requested)}. The extension has all 54.`);
+  showToast(`This demo has audio for four voices, so ${voiceName(used)} stands in for ${voiceName(requested)}. The extension has all 53.`);
 });
 
 // --- What background/offscreen would answer ---
