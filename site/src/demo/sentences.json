@@ -1,0 +1,88 @@
+{
+  "voices": {
+    "af_heart": {
+      "accent": "us",
+      "quoteVoice": "am_michael"
+    },
+    "am_michael": {
+      "accent": "us",
+      "quoteVoice": "af_heart"
+    },
+    "bf_emma": {
+      "accent": "gb",
+      "quoteVoice": "bm_george"
+    },
+    "bm_george": {
+      "accent": "gb",
+      "quoteVoice": "bf_emma"
+    }
+  },
+  "previewText": "This is how I sound reading your pages.",
+  "previewVoices": [
+    "af_heart",
+    "af_alloy",
+    "af_aoede",
+    "af_bella",
+    "af_jessica",
+    "af_kore",
+    "af_nicole",
+    "af_nova",
+    "af_river",
+    "af_sarah",
+    "af_sky",
+    "am_adam",
+    "am_echo",
+    "am_eric",
+    "am_fenrir",
+    "am_liam",
+    "am_michael",
+    "am_onyx",
+    "am_puck",
+    "am_santa",
+    "bf_alice",
+    "bf_emma",
+    "bf_isabella",
+    "bf_lily",
+    "bm_daniel",
+    "bm_fable",
+    "bm_george",
+    "bm_lewis"
+  ],
+  "sentences": [
+    {
+      "text": "Why I stopped skimming"
+    },
+    {
+      "text": "Most of what I read happens in a browser tab, usually with three other tabs begging for attention."
+    },
+    {
+      "text": "Now I select a paragraph, press Read, and let a calm voice carry me through it while my eyes follow the highlight."
+    },
+    {
+      "text": "The voice is Kokoro, a small neural model that runs on my own laptop."
+    },
+    {
+      "text": "Nothing I read is uploaded anywhere, and it keeps working on a plane."
+    },
+    {
+      "text": "It also reads the messy parts the way a person would."
+    },
+    {
+      "text": "A €12.50 ticket on 2024-01-15, a 10GB download, a thank-you to @jane_doe and a link to https://github.com/hakubo/ReadIt all come out sounding natural.",
+      "spoken": {
+        "us": "A 12 euros 50 cents ticket on January 15th, 2024, a 10 gigabyte download, a thank-you to jane doe and a link to github.com all come out sounding natural.",
+        "gb": "A 12 euros 50 cents ticket on 15th January 2024, a 10 gigabyte download, a thank-you to jane doe and a link to github.com all come out sounding natural."
+      }
+    },
+    {
+      "text": "Quotes get a voice of their own."
+    },
+    {
+      "text": "Reading is to the mind what exercise is to the body.",
+      "quoted": true
+    },
+    {
+      "text": "Try another voice in the settings, change the speed, or click any sentence to jump straight to it."
+    }
+  ]
+}
