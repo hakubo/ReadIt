@@ -6,7 +6,7 @@
     <title>Read it! — Free text-to-speech for Chrome that runs on your computer</title>
     <meta
       name="description"
-      content="Read it! reads any webpage aloud in natural Kokoro voices. It runs on your own computer: free, no account, and your text never leaves the browser."
+      content="Read it! reads any webpage aloud in natural voices, made by the Kokoro text-to-speech model. It runs on your own computer: free, no account, and your text never leaves the browser."
     />
     <meta property="og:title" content="Read it! — listen to any webpage" />
     <meta
@@ -47,7 +47,7 @@
         </h1>
         <p class="lede">
           Select text, press Read, and it reads aloud while the sentence lights up on the page.
-          The voice is <strong>Kokoro</strong>, a neural speech model that runs inside your browser.
+          The speech comes from <strong>Kokoro</strong>, a neural text-to-speech model that runs inside your browser.
           No account, no subscription, and nothing you read is sent to a server.
         </p>
         <div class="hero-actions">
@@ -58,7 +58,7 @@
           </button>
         </div>
         <ul class="hero-facts" aria-label="At a glance">
-          <li><strong>54</strong> voices</li>
+          <li><strong>53</strong> voices</li>
           <li><strong>8</strong> languages</li>
           <li><strong>0</strong> bytes of your text uploaded</li>
         </ul>
@@ -71,7 +71,7 @@
           <h2 id="demo-title">This is the real player.</h2>
           <p>
             The pill and the settings panel below are the extension's own components, running on this page.
-            The voices are recordings of Kokoro, so you don't have to download the model to hear it.
+            The audio was generated with Kokoro ahead of time, so you don't have to download the model to hear it.
           </p>
         </div>
 
@@ -98,7 +98,7 @@
                 Now I select a paragraph, press Read, and let a calm voice carry me through it while my eyes follow the highlight.
               </p>
               <p>
-                The voice is Kokoro, a small neural model that runs on my own laptop.
+                The speech comes from Kokoro, a small text-to-speech model that runs on my own laptop.
                 Nothing I read is uploaded anywhere, and it keeps working on a plane.
               </p>
               <p>
@@ -171,7 +171,7 @@
           </article>
 
           <article class="feature">
-            <h3>54 voices, 8 languages</h3>
+            <h3>53 voices, 8 languages</h3>
             <p>
               American and British English, Spanish, Brazilian Portuguese, Italian, Hindi, Japanese and Chinese.
               Text marked as another language switches to a matching voice, and quotes can use a second voice.
@@ -181,8 +181,8 @@
           <article class="feature">
             <h3>Reads what the page means</h3>
             <p>
-              Image descriptions are read out, code blocks and struck-out text are skipped, keyboard keys and exponents
-              are said properly. Each one is a switch in the settings.
+              Image descriptions are read out and code blocks and struck-out text are skipped, each with its own switch
+              in the settings. Keyboard keys and exponents are said properly.
             </p>
           </article>
 
@@ -229,7 +229,7 @@
             <tbody>
               <tr>
                 <th scope="row">Natural-sounding voice</th>
-                <td class="compare-us"><span class="yes">Yes</span>, neural (Kokoro)</td>
+                <td class="compare-us"><span class="yes">Yes</span>, a neural model (Kokoro)</td>
                 <td><span class="no">Mostly robotic</span></td>
                 <td><span class="yes">Yes</span></td>
               </tr>
@@ -314,7 +314,7 @@
             <dt>English gets the most care</dt>
             <dd>
               The other seven languages are read well, but the rewriting of prices, dates and units is English only.
-              Kokoro has no voice for languages such as German, French or Polish yet.
+              There are no voices yet for languages such as German, French or Polish.
             </dd>
           </div>
           <div>
@@ -327,7 +327,7 @@
           <div>
             <dt>It uses memory while it reads</dt>
             <dd>
-              The model sits in memory during a read and for three minutes after, so the next read starts quickly.
+              The model stays in memory while it makes speech and for three minutes after, so the next read starts quickly.
               Then it is unloaded.
             </dd>
           </div>
@@ -361,7 +361,7 @@
           </p>
         </details>
         <details>
-          <summary>How do I read a whole page?</summary>
+          <summary>How do I read a page without selecting anything?</summary>
           <p>
             Press <kbd>Alt</kbd>+<kbd>R</kbd>, or press Play on the pill with nothing selected. It finds the main text and
             starts from the top.
@@ -403,8 +403,8 @@
 
     <footer class="site-footer">
       <p>
-        Read it! is open source. Voices by <a href="https://huggingface.co/hexgrad/Kokoro-82M">Kokoro</a>,
-        run with <a href="https://onnxruntime.ai/">ONNX Runtime</a> and
+        Read it! is open source. Speech by the <a href="https://huggingface.co/hexgrad/Kokoro-82M">Kokoro</a>
+        text-to-speech model, run with <a href="https://onnxruntime.ai/">ONNX Runtime</a> and
         <a href="https://github.com/espeak-ng/espeak-ng">eSpeak NG</a>.
       </p>
       <p class="footer-links">
