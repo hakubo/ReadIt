@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Read it! — Free text-to-speech for Chrome that runs on your computer</title>
+    <meta
+      name="description"
+      content="Read it! reads any webpage aloud in natural Kokoro voices. It runs on your own computer: free, no account, and your text never leaves the browser."
+    />
+    <meta property="og:title" content="Read it! — listen to any webpage" />
+    <meta
+      property="og:description"
+      content="Natural voices, sentence highlighting, and nothing sent to a server. A free Chrome extension."
+    />
+    <meta property="og:image" content="./og.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/png" href="./icon-128.png" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <div class="site-header-wrap">
+      <header class="site-header">
+        <a class="brand" href="#top" aria-label="Read it! home">
+          <img src="./icon-128.png" alt="" width="28" height="28" />
+          <span>Read it!</span>
+        </a>
+        <nav class="site-nav" aria-label="Sections">
+          <a href="#demo">Demo</a>
+          <a href="#features">Features</a>
+          <a href="#different">Why it's different</a>
+          <a href="#limits">Limits</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+        <a class="button button-small" data-store-link href="https://chromewebstore.google.com/detail/read-it-%E2%80%93-free-local-text/gpgbpfimeifbjlmonnnlofchlmimmfph">Add to Chrome</a>
+      </header>
+    </div>
+
+    <main id="main">
+      <!-- Hero -->
+      <section class="hero" id="top">
+        <p class="eyebrow">Free Chrome extension &middot; runs on your computer</p>
+        <h1>
+          Listen to any page, in a voice that
+          <mark class="hero-mark">sounds like a person.</mark>
+        </h1>
+        <p class="lede">
+          Select text, press Read, and it reads aloud while the sentence lights up on the page.
+          The voice is <strong>Kokoro</strong>, a neural speech model that runs inside your browser.
+          No account, no subscription, and nothing you read is sent to a server.
+        </p>
+        <div class="hero-actions">
+          <a class="button" data-store-link href="https://chromewebstore.google.com/detail/read-it-%E2%80%93-free-local-text/gpgbpfimeifbjlmonnnlofchlmimmfph">Add to Chrome, it's free</a>
+          <button class="button button-ghost" type="button" data-read-demo>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" /></svg>
+            Hear it on this page
+          </button>
+        </div>
+        <ul class="hero-facts" aria-label="At a glance">
+          <li><strong>54</strong> voices</li>
+          <li><strong>8</strong> languages</li>
+          <li><strong>0</strong> bytes of your text uploaded</li>
+        </ul>
+      </section>
+
+      <!-- Demo -->
+      <section class="demo" id="demo" aria-labelledby="demo-title">
+        <div class="section-head">
+          <p class="eyebrow">Try it</p>
+          <h2 id="demo-title">This is the real player.</h2>
+          <p>
+            The pill and the settings panel below are the extension's own components, running on this page.
+            The voices are recordings of Kokoro, so you don't have to download the model to hear it.
+          </p>
+        </div>
+
+        <ol class="demo-steps">
+          <li><span>1</span>Select a few sentences in the article</li>
+          <li><span>2</span>Press the <b>Read</b> button that appears</li>
+          <li><span>3</span>Click any sentence to jump, or open <b>settings</b> to change the voice</li>
+        </ol>
+
+        <div class="browser" role="group" aria-label="Demo page">
+          <div class="browser-bar">
+            <span class="browser-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="browser-url">your-favourite-blog.com/why-i-stopped-skimming</span>
+            <button class="browser-ext" type="button" data-read-demo title="Read this page">
+              <img src="./icon-128.png" alt="" width="18" height="18" />
+              <span>Read page</span>
+            </button>
+          </div>
+          <div class="browser-page">
+            <article id="demo-article" class="demo-article">
+              <h3>Why I stopped skimming</h3>
+              <p>
+                Most of what I read happens in a browser tab, usually with three other tabs begging for attention.
+                Now I select a paragraph, press Read, and let a calm voice carry me through it while my eyes follow the highlight.
+              </p>
+              <p>
+                The voice is Kokoro, a small neural model that runs on my own laptop.
+                Nothing I read is uploaded anywhere, and it keeps working on a plane.
+              </p>
+              <p>
+                It also reads the messy parts the way a person would.
+                A €12.50 ticket on 2024-01-15, a 10GB download, a thank-you to @jane_doe and a link to
+                <a href="https://github.com/hakubo/ReadIt" tabindex="-1">https://github.com/hakubo/ReadIt</a>
+                all come out sounding natural.
+              </p>
+              <p>Quotes get a voice of their own.</p>
+              <blockquote>Reading is to the mind what exercise is to the body.</blockquote>
+              <p>
+                Try another voice in the settings, change the speed, or click any sentence to jump straight to it.
+              </p>
+            </article>
+          </div>
+        </div>
+        <p class="demo-note">
+          Keyboard: <kbd>Space</kbd> play/pause, <kbd>←</kbd> <kbd>→</kbd> previous/next sentence,
+          <kbd>↑</kbd> <kbd>↓</kbd> speed.
+          <button class="link-button" type="button" data-open-settings>Open the settings panel</button>
+        </p>
+      </section>
+
+      <!-- Features -->
+      <section class="features" id="features" aria-labelledby="features-title">
+        <div class="section-head">
+          <p class="eyebrow">Features</p>
+          <h2 id="features-title">Made for reading long things.</h2>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature feature-wide">
+            <div>
+              <h3>Says it the way you would</h3>
+              <p>
+                Speech engines tend to read symbols literally. Read it! rewrites them first, so prices, dates and links
+                sound the way a person says them.
+              </p>
+            </div>
+            <table class="spoken-table">
+              <caption class="visually-hidden">Examples of written text and how it is spoken</caption>
+              <thead>
+                <tr><th scope="col">On the page</th><th scope="col">What you hear</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>€12.50</code></td><td>“12 euros 50 cents”</td></tr>
+                <tr><td><code>2024-01-15</code></td><td>“January 15th, 2024” <small>(or “15th January” with a British voice)</small></td></tr>
+                <tr><td><code>https://www.github.com/a/b</code></td><td>“github.com”</td></tr>
+                <tr><td><code>@JaneDoe</code> &middot; <code>#MachineLearning</code></td><td>“Jane Doe” &middot; “Machine Learning”</td></tr>
+                <tr><td><code>10GB</code> &middot; <code>60 km/h</code> &middot; <code>25°C</code></td><td>“10 gigabytes” &middot; “60 kilometers per hour” &middot; “25 degrees Celsius”</td></tr>
+                <tr><td><code>Henry VIII</code> &middot; <code>World War II</code></td><td>“Henry the Eighth” &middot; “World War 2”</td></tr>
+              </tbody>
+            </table>
+          </article>
+
+          <article class="feature">
+            <h3>The highlight follows along</h3>
+            <p>
+              The sentence being read is highlighted on the page itself, and the page scrolls to keep it in view.
+              Scroll away and it waits a few seconds before following again. Click any sentence to jump there.
+            </p>
+          </article>
+
+          <article class="feature">
+            <h3>Finds the article</h3>
+            <p>
+              With nothing selected, it reads the main text and skips menus, footers, cookie banners and comment sections.
+              If it guesses wrong on a site, point at the right part once and it remembers.
+            </p>
+          </article>
+
+          <article class="feature">
+            <h3>54 voices, 8 languages</h3>
+            <p>
+              American and British English, Spanish, Brazilian Portuguese, Italian, Hindi, Japanese and Chinese.
+              Text marked as another language switches to a matching voice, and quotes can use a second voice.
+            </p>
+          </article>
+
+          <article class="feature">
+            <h3>Reads what the page means</h3>
+            <p>
+              Image descriptions are read out, code blocks and struck-out text are skipped, keyboard keys and exponents
+              are said properly. Each one is a switch in the settings.
+            </p>
+          </article>
+
+          <article class="feature">
+            <h3>Per-site settings</h3>
+            <p>
+              A different voice for one site, a faster speed for another, extra parts to skip.
+              Your own text rules let you fix how a word is pronounced.
+            </p>
+          </article>
+
+          <article class="feature">
+            <h3>Stays out of the way</h3>
+            <p>
+              A small pill you can drag anywhere or shrink to a play button. Light or dark. Speed from 0.6&times; to 2&times;.
+              Turn it off for a site with one click on the toolbar icon.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <!-- Different -->
+      <section class="different" id="different" aria-labelledby="different-title">
+        <div class="section-head">
+          <p class="eyebrow">Why it's different</p>
+          <h2 id="different-title">A good voice usually costs a subscription and your text.</h2>
+          <p>
+            Most readers either use the robotic voices built into your system, or send what you read to a cloud
+            service and charge by the month. Read it! runs a neural voice locally, so you get neither trade-off.
+          </p>
+        </div>
+
+        <div class="table-scroll">
+          <table class="compare">
+            <caption class="visually-hidden">Read it! compared with built-in voices and cloud voice services</caption>
+            <thead>
+              <tr>
+                <th scope="col"></th>
+                <th scope="col" class="compare-us">Read it!</th>
+                <th scope="col">Built-in system voices</th>
+                <th scope="col">Cloud voice services</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Natural-sounding voice</th>
+                <td class="compare-us"><span class="yes">Yes</span>, neural (Kokoro)</td>
+                <td><span class="no">Mostly robotic</span></td>
+                <td><span class="yes">Yes</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Your text stays on your computer</th>
+                <td class="compare-us"><span class="yes">Always</span></td>
+                <td><span class="maybe">Depends on the voice</span></td>
+                <td><span class="no">No</span>, it's sent to their servers</td>
+              </tr>
+              <tr>
+                <th scope="row">Price</th>
+                <td class="compare-us"><span class="yes">Free</span>, no limits</td>
+                <td><span class="yes">Free</span></td>
+                <td><span class="no">Usually monthly</span> or a character quota</td>
+              </tr>
+              <tr>
+                <th scope="row">Account needed</th>
+                <td class="compare-us"><span class="yes">No</span></td>
+                <td><span class="yes">No</span></td>
+                <td><span class="no">Usually</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Works offline</th>
+                <td class="compare-us"><span class="yes">Yes</span>, after the first download</td>
+                <td><span class="maybe">Local voices only</span></td>
+                <td><span class="no">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Prices, dates and links read naturally</th>
+                <td class="compare-us"><span class="yes">Yes</span> (English voices)</td>
+                <td><span class="no">No</span></td>
+                <td><span class="maybe">Varies</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Highlight on the page itself</th>
+                <td class="compare-us"><span class="yes">Yes</span>, sentence by sentence</td>
+                <td><span class="maybe">Varies</span></td>
+                <td><span class="maybe">Often in a separate reader view</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Source code you can read</th>
+                <td class="compare-us"><span class="yes">Yes</span>, on GitHub</td>
+                <td><span class="maybe">Varies</span></td>
+                <td><span class="no">Rarely</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Limits -->
+      <section class="limits" id="limits" aria-labelledby="limits-title">
+        <div class="section-head">
+          <p class="eyebrow">Limits</p>
+          <h2 id="limits-title">What to know before you install.</h2>
+          <p>Running a voice model on your own machine has costs. Here they are, plainly.</p>
+        </div>
+
+        <dl class="limit-list">
+          <div>
+            <dt>A one-time 326 MB download</dt>
+            <dd>
+              The model downloads from Hugging Face the first time you press Play, and each voice (about half a megabyte)
+              the first time you use it. After that everything is cached and works offline.
+            </dd>
+          </div>
+          <div>
+            <dt>Speed depends on your computer</dt>
+            <dd>
+              With a GPU that Chrome can use (WebGPU), speech is generated faster than it's spoken.
+              On older or CPU-only machines the first sentence can take a few seconds, and very long sentences can make
+              playback pause while the next one is made.
+            </dd>
+          </div>
+          <div>
+            <dt>Chrome on a desktop or laptop</dt>
+            <dd>
+              It needs features of desktop Chrome. There's no mobile version, and other Chromium browsers aren't tested.
+            </dd>
+          </div>
+          <div>
+            <dt>English gets the most care</dt>
+            <dd>
+              The other seven languages are read well, but the rewriting of prices, dates and units is English only.
+              Kokoro has no voice for languages such as German, French or Polish yet.
+            </dd>
+          </div>
+          <div>
+            <dt>Some pages are off limits</dt>
+            <dd>
+              Chrome doesn't let extensions into its own pages, the Chrome Web Store or the built-in PDF viewer.
+              Text drawn as pixels on a canvas (the Google Docs editor, for example) can't be read either.
+            </dd>
+          </div>
+          <div>
+            <dt>It uses memory while it reads</dt>
+            <dd>
+              The model sits in memory during a read and for three minutes after, so the next read starts quickly.
+              Then it is unloaded.
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <!-- Privacy -->
+      <section class="privacy" aria-labelledby="privacy-title">
+        <div class="privacy-card">
+          <h2 id="privacy-title">Nothing to sign up for, nothing to track.</h2>
+          <p>
+            No account, no analytics, no ads. The only things the extension downloads are the model and voice files,
+            from Hugging Face. What you read is turned into speech on your computer and goes nowhere else.
+            This page doesn't track you either.
+          </p>
+          <a href="https://github.com/hakubo/ReadIt/blob/main/PRIVACY.md">Read the privacy policy</a>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="faq" id="faq" aria-labelledby="faq-title">
+        <div class="section-head">
+          <p class="eyebrow">FAQ</p>
+          <h2 id="faq-title">Questions</h2>
+        </div>
+        <details>
+          <summary>Is it really free?</summary>
+          <p>
+            Yes. There's no paid tier and no usage limit, because there's no server to pay for: your computer does the work.
+            If you'd like to support it, there's a coffee button in the player.
+          </p>
+        </details>
+        <details>
+          <summary>How do I read a whole page?</summary>
+          <p>
+            Press <kbd>Alt</kbd>+<kbd>R</kbd>, or press Play on the pill with nothing selected. It finds the main text and
+            starts from the top.
+          </p>
+        </details>
+        <details>
+          <summary>Why is the download so big?</summary>
+          <p>
+            That's the voice model itself. Smaller, compressed versions exist, but they sounded noticeably worse, so the
+            extension uses the full one. You download it once.
+          </p>
+        </details>
+        <details>
+          <summary>Which voice should I pick?</summary>
+          <p>
+            Heart (American English) is the default and a good start. Open the settings, press the play button next to any
+            voice to hear it, and pick the one you like listening to for an hour.
+          </p>
+        </details>
+        <details>
+          <summary>Does it work offline?</summary>
+          <p>Yes, once the model and the voice you use have been downloaded.</p>
+        </details>
+        <details>
+          <summary>Can websites tell I have it installed?</summary>
+          <p>
+            A site could spot one small file it makes available, the audio player that lets it play sound on sites with
+            strict security rules. That's true of most extensions. Read it! never sends a site anything, and it asks for
+            as few permissions as it can.
+          </p>
+        </details>
+      </section>
+
+      <section class="final-cta">
+        <h2>Give your eyes a break.</h2>
+        <a class="button" data-store-link href="https://chromewebstore.google.com/detail/read-it-%E2%80%93-free-local-text/gpgbpfimeifbjlmonnnlofchlmimmfph">Add Read it! to Chrome</a>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        Read it! is open source. Voices by <a href="https://huggingface.co/hexgrad/Kokoro-82M">Kokoro</a>,
+        run with <a href="https://onnxruntime.ai/">ONNX Runtime</a> and
+        <a href="https://github.com/espeak-ng/espeak-ng">eSpeak NG</a>.
+      </p>
+      <p class="footer-links">
+        <a href="https://github.com/hakubo/ReadIt">GitHub</a>
+        <a href="https://github.com/hakubo/ReadIt/blob/main/PRIVACY.md">Privacy</a>
+        <a href="https://buymeacoffee.com/jakubolek">Buy me a coffee</a>
+      </p>
+    </footer>
+
+    <div id="demo-toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

@@ -246,6 +246,10 @@ When the loop is parked at the window limit it awaits `generateResolve`. Any abo
 - **Timing:** offscreen sends `TTS_TIMING` (warm-up wait, model load, text prep, synthesis, `webgpu`/`cpu`, plus `Date.now()` stamps for when it received the request and sent the first WAV) with the first audio. Content adds its own stamps (Play, `GENERATE_TTS` sent, first WAV received, audio playing) so `StartTimingTracker` can also show prepare / offscreen (includes creating the document) / deliver / play gaps. `performance.now()` has a different origin per extension context, so cross-context gaps must use `Date.now()`. Local builds log `[Read it!] Start-up: …` and shows it as "Last start" in Settings → Status.
 - Rejected on purpose: smaller/quantized models (worse voice quality) and splitting a long first sentence (UX trade-off).
 
+## Landing Page (GitHub Pages)
+
+`site/` is the landing page: `npm run site:dev`, `npm run site:build` (→ `site-dist/`, deployed by `.github/workflows/pages.yml` on push to `main`). It renders the real `FloatingPlayer`, `SettingsPanel`, `SelectionButton` and `HighlightManager` from `src/` against a fake `chrome` API (`site/src/chromeShim.ts`), so UI changes show up there too. The demo plays pre-rendered Kokoro clips instead of loading the model: 4 voices for the article in `site/src/demo/sentences.json` plus previews for the English voices. After editing the article text, update `sentences.json` to match it exactly and regenerate with `node scripts/generate-site-audio.mjs` (see the script header for the one-off setup). Other voices map to the closest recorded one.
+
 ## Debug Panel (local builds)
 
 `npm run build` defines `__DEBUG_TOOLS__ = true` (Vite `define`, declared in `src/globals.d.ts`); `npm run build:release` sets `READIT_RELEASE=1`, which makes it `false` so `installDebugPanel` and the panel are tree-shaken out of `content.js`. Vitest defines it as `true`.
