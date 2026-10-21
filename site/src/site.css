@@ -649,6 +649,31 @@ main > section {
   gap: 20px;
 }
 
+/* ---------- Buy me a coffee ---------- */
+
+/* Self-hosted look-alike of the Buy Me a Coffee widget: their script would load third-party code on a page that promises no tracking */
+.bmc-widget {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px 12px 14px;
+  border-radius: 999px;
+  background: #ffdd00;
+  color: #0d0c22;
+  font: 600 15px/1 var(--sans);
+  text-decoration: none;
+  box-shadow: 0 12px 28px -12px rgba(0, 0, 0, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  z-index: 15;
+}
+.bmc-widget:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 32px -12px rgba(0, 0, 0, 0.5);
+}
+
 /* ---------- Toast ---------- */
 
 .toast {
@@ -694,6 +719,19 @@ main > section {
 }
 
 @media (max-width: 600px) {
+  .bmc-widget {
+    right: 16px;
+    bottom: 16px;
+    padding: 13px;
+  }
+  .bmc-widget span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   body {
     font-size: 16px;
   }
@@ -736,6 +774,7 @@ main > section {
     background-size: 100% 100%;
   }
   .button,
+  .bmc-widget,
   .toast {
     transition: none;
   }

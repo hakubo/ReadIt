@@ -4,6 +4,9 @@ Free, local text-to-speech voice reader for Chrome.
 
 A Chrome extension that adds text-to-speech to any webpage. Select text, click "Read", and listen — powered by [Kokoro](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX), running 100% locally in your browser.
 
+- **Install:** [Chrome Web Store](https://chromewebstore.google.com/detail/read-it-%E2%80%93-free-local-text/gpgbpfimeifbjlmonnnlofchlmimmfph)
+- **Website and live demo:** [hakubo.github.io/ReadIt](https://hakubo.github.io/ReadIt/)
+
 If you find this project useful, consider supporting its development:
 
 <a href="https://www.buymeacoffee.com/jakubolek" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="40"></a>
@@ -18,6 +21,8 @@ If you find this project useful, consider supporting its development:
 - Fully private — your text never leaves your browser (only the model and voices are downloaded, once)
 
 ## Install
+
+Get it from the [Chrome Web Store](https://chromewebstore.google.com/detail/read-it-%E2%80%93-free-local-text/gpgbpfimeifbjlmonnnlofchlmimmfph), or build it yourself:
 
 ```bash
 npm install
