@@ -42,15 +42,39 @@ export async function saveGlobalSettings(settings: TTSSettings): Promise<void> {
   await chrome.storage.sync.set({ settings });
 }
 
-export async function saveDomainSettings(
+export function saveDomainSettings(
   hostname: string,
   settings: TTSSettings
 ): Promise<void> {
+  return updateSitePrefs(hostname, { settings });
+}
+
+// Chains this context's site-pref writes so two quick updates (drag, then
+// minimize, or a setting change right before a dismissal) can't both read the
+// same old value and drop each other's field.
+let sitePrefsWriteQueue: Promise<unknown> = Promise.resolve();
+
+/**
+ * Merge updates into the stored prefs for a site. Reads storage instead of
+ * trusting an in-memory copy: another tab on the same site may have changed
+ * other fields (e.g. `enabled`) since this one loaded. An `undefined` value
+ * removes that field.
+ */
+export function updateSitePrefs(hostname: string, updates: Partial<SitePrefs>): Promise<void> {
   const key = `site:${hostname}`;
-  const result = await chrome.storage.local.get(key);
-  const prefs = (result[key] as SitePrefs | undefined) ?? ({} as SitePrefs);
-  prefs.settings = settings;
-  await chrome.storage.local.set({ [key]: prefs });
+  const write = sitePrefsWriteQueue.then(async () => {
+    const result = await chrome.storage.local.get(key);
+    const stored = (result[key] as SitePrefs | undefined) ?? {};
+    const next: SitePrefs = { ...stored, ...updates };
+    for (const field of Object.keys(updates) as (keyof SitePrefs)[]) {
+      if (updates[field] === undefined) {
+        delete next[field];
+      }
+    }
+    await chrome.storage.local.set({ [key]: next });
+  });
+  sitePrefsWriteQueue = write.catch(() => {});
+  return write;
 }
 
 /** Noise selectors picked on this site (SitePrefs.noiseSelectors). */
@@ -64,20 +88,21 @@ export async function getSiteNoiseSelectors(hostname: string): Promise<string[]>
   }
 }
 
-export async function saveSiteNoiseSelectors(hostname: string, selectors: string[]): Promise<void> {
-  const key = `site:${hostname}`;
-  const result = await chrome.storage.local.get(key);
-  const prefs = (result[key] as SitePrefs | undefined) ?? ({} as SitePrefs);
-  prefs.noiseSelectors = selectors;
-  await chrome.storage.local.set({ [key]: prefs });
+export function saveSiteNoiseSelectors(hostname: string, selectors: string[]): Promise<void> {
+  return updateSitePrefs(hostname, { noiseSelectors: selectors });
 }
 
-export async function clearDomainSettings(hostname: string): Promise<void> {
+export function clearDomainSettings(hostname: string): Promise<void> {
   const key = `site:${hostname}`;
-  const result = await chrome.storage.local.get(key);
-  const prefs = result[key] as SitePrefs | undefined;
-  if (prefs) {
-    delete prefs.settings;
-    await chrome.storage.local.set({ [key]: prefs });
-  }
+  const write = sitePrefsWriteQueue.then(async () => {
+    const result = await chrome.storage.local.get(key);
+    const prefs = result[key] as SitePrefs | undefined;
+    if (prefs) {
+      const next = { ...prefs };
+      delete next.settings;
+      await chrome.storage.local.set({ [key]: next });
+    }
+  });
+  sitePrefsWriteQueue = write.catch(() => {});
+  return write;
 }
