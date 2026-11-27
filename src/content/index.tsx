@@ -2,7 +2,7 @@ import { createRoot, Root } from "react-dom/client";
 import { SelectionButton } from "./SelectionButton";
 import { FloatingPlayer, type PlayerState } from "./FloatingPlayer";
 import { type ReadHints, type TTSSettings, type SitePrefs, DEFAULT_NOISE_SELECTORS, SENTENCE_PAUSE_MS } from "@/shared/types";
-import { getEffectiveSettings, getDomainSettings, saveGlobalSettings, saveDomainSettings } from "@/shared/settings";
+import { getEffectiveSettings, getDomainSettings, saveGlobalSettings, saveDomainSettings, updateSitePrefs } from "@/shared/settings";
 import { setPlaybackState, setStartTiming, getStartTiming } from "./playerStore";
 import { SHADOW_STYLES } from "./styles";
 import { detectMainContentWithRoot, isValidSelector, setNoiseSelector } from "./contentDetection";
@@ -137,7 +137,9 @@ let sitePrefs: SitePrefs = {};
 
 function saveSitePrefs(updates: Partial<SitePrefs>) {
   sitePrefs = { ...sitePrefs, ...updates };
-  chrome.storage.local.set({ [SITE_KEY]: sitePrefs });
+  // Merge into storage, not this tab's copy: writing the whole copy would undo
+  // fields another tab on this site changed since (e.g. a dismissal).
+  updateSitePrefs(currentDomain, updates).catch(() => {});
 }
 
 // ---------------------------------------------------------------------------
@@ -203,8 +205,16 @@ let generationError: string | null = null;
 let generationErrorTimer: ReturnType<typeof setTimeout> | null = null;
 const GENERATION_ERROR_DISPLAY_MS = 8000;
 
-// Extension enabled state
-let extensionEnabled = true;
+// Extension enabled state (stays false until init() reads sitePrefs, so
+// selection/shortcuts can't mount UI on a dismissed site before init finishes).
+let extensionEnabled = false;
+let initialized = false;
+let storageChangedDuringInit = false;
+let initPromise: Promise<void> = Promise.resolve();
+
+function isHtmlDocument(): boolean {
+  return !document.contentType || document.contentType.startsWith("text/html");
+}
 
 // Settings panel requested from context menu
 let openSettingsRequested = false;
@@ -1012,6 +1022,29 @@ function applySettingsChange(newSettings: TTSSettings) {
   }
 }
 
+async function applyStoredSitePrefs(prefs: SitePrefs) {
+  const enabledChanged = prefs.enabled !== sitePrefs.enabled;
+  // Other tabs on this site and the settings panel write here too; adopt
+  // their values so this tab acts on them.
+  sitePrefs = prefs;
+  // Dismissed or re-enabled from another tab: follow it here too.
+  if (initialized && enabledChanged && prefs.enabled !== undefined && !extensionContextInvalidated) {
+    applySiteEnabled(prefs.enabled);
+  }
+  if (prefs.settings) {
+    applySettingsChange(prefs.settings);
+  } else {
+    const global = await getSettings();
+    applySettingsChange(global);
+  }
+}
+
+async function syncSitePrefsFromStorage() {
+  if (!ensureExtensionContext(false)) {return;}
+  const result = await chrome.storage.local.get(SITE_KEY);
+  await applyStoredSitePrefs((result[SITE_KEY] as SitePrefs | undefined) ?? {});
+}
+
 chrome.storage.onChanged.addListener(async (changes, areaName) => {
   if (areaName === "sync" && changes.settings?.newValue) {
     const domainSettings = await getDomainSettings(currentDomain);
@@ -1019,17 +1052,11 @@ chrome.storage.onChanged.addListener(async (changes, areaName) => {
       applySettingsChange(changes.settings.newValue as TTSSettings);
     }
   }
-  if (areaName === "local" && changes[SITE_KEY]?.newValue) {
-    const prefs = changes[SITE_KEY].newValue as SitePrefs;
-    // The settings panel writes these fields straight to storage; keep the
-    // in-memory copy current so the next saveSitePrefs() doesn't revert them.
-    sitePrefs = { ...sitePrefs, settings: prefs.settings, noiseSelectors: prefs.noiseSelectors };
-    if (prefs.settings) {
-      applySettingsChange(prefs.settings);
-    } else {
-      const global = await getSettings();
-      applySettingsChange(global);
+  if (areaName === "local" && changes[SITE_KEY]?.newValue && isHtmlDocument()) {
+    if (!initialized) {
+      storageChangedDuringInit = true;
     }
+    await applyStoredSitePrefs(changes[SITE_KEY].newValue as SitePrefs);
   }
 });
 
@@ -1147,27 +1174,49 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (message.type === "OPEN_SETTINGS") {
+    if (!isHtmlDocument()) {return;}
     openSettingsRequested = true;
     showPlayer();
   }
 
   if (message.type === "EXTENSION_TOGGLE") {
-    // Toggle based on actual player visibility so the icon click always does
-    // the intuitive thing — including in auto-mode where 'enabled' is undefined.
-    const nowEnabled = !playerRoot;
-    extensionEnabled = nowEnabled;
-    saveSitePrefs({ enabled: nowEnabled });
-    if (!nowEnabled) {
-      hideSelectionButton();
-      destroyPlayer();
-    } else {
-      if (!totalEstimatedDuration) {
-        estimatePageDuration();
-      }
-      showPlayer();
-    }
+    if (!isHtmlDocument()) {return;}
+    // Wait for init() so an early icon click toggles the real state instead
+    // of seeing !playerRoot === true before the player has mounted.
+    void initPromise.then(() => {
+      if (extensionContextInvalidated) {return;}
+      // Toggle based on actual player visibility so the icon click always does
+      // the intuitive thing — including in auto-mode where 'enabled' is undefined.
+      const nowEnabled = !playerRoot;
+      saveSitePrefs({ enabled: nowEnabled });
+      applySiteEnabled(nowEnabled);
+    });
   }
 });
+
+/** Show or remove the UI for an explicit per-site on/off (this tab or another). */
+function applySiteEnabled(enabled: boolean) {
+  extensionEnabled = enabled;
+  if (!enabled) {
+    stopContentObserver?.();
+    elementPicker.stop();
+    hideSelectionButton();
+    if (playerRoot) {
+      destroyPlayer();
+    } else if (currentReadId !== null || hasReadState()) {
+      // Cancel an in-flight startRead() (e.g. triggered from selection button
+      // or shortcut while playerRoot was still null) so it doesn't mount the
+      // player after its async getSettings() resolves.
+      stopPlayback();
+    }
+    return;
+  }
+  if (playerRoot) {return;}
+  if (!totalEstimatedDuration) {
+    estimatePageDuration();
+  }
+  showPlayer();
+}
 
 // ---------------------------------------------------------------------------
 // DOM event listeners
@@ -1453,7 +1502,7 @@ if (__DEBUG_TOOLS__) {
 }
 
 async function init() {
-  if (document.contentType && !document.contentType.startsWith("text/html")) {return;}
+  if (!isHtmlDocument()) {return;}
 
   const settings = await getSettings();
   currentTheme = settings.theme || "dark";
@@ -1461,14 +1510,35 @@ async function init() {
   audioEngine.setCurrentSpeed(settings.speed);
 
   const result = await chrome.storage.local.get(SITE_KEY);
-  sitePrefs = result[SITE_KEY] || {};
+  if (!storageChangedDuringInit) {
+    sitePrefs = result[SITE_KEY] || {};
+  }
   applyContentFilters(settings);
+  initialized = true;
+
+  // Register lifecycle listeners even when currently dismissed, so re-enabling
+  // this tab later or restoring it from bfcache works without a reload.
+  observeRouteChanges(handleRouteChange, handleRouteContentReady);
+
+  // Suppress spurious TTS error alerts during real navigation: awaitGeneration()
+  // checks closedManually and skips the alert. pagehide, not beforeunload:
+  // beforeunload also fires when the page stays (a link that turns into a
+  // download, Cancel on "Leave site?"), which would mute the rest of the read.
+  window.addEventListener("pagehide", () => { closedManually = true; });
+
+  // Chrome's bfcache freezes pages without delivering storage.onChanged while
+  // hidden. Re-sync on restore so a dismissal made on another page takes effect.
+  window.addEventListener("pageshow", (event) => {
+    if (!event.persisted || extensionContextInvalidated) {return;}
+    void syncSitePrefsFromStorage();
+  });
 
   if (sitePrefs.enabled === false) {
     extensionEnabled = false;
     return;
   }
 
+  extensionEnabled = true;
   estimatePageDuration();
 
   // Show player automatically only if the user explicitly enabled it for this
@@ -1480,18 +1550,9 @@ async function init() {
 
   setupContentObserver();
 
-  // Detect SPA route changes: stop playback and re-detect content.
-  observeRouteChanges(handleRouteChange, handleRouteContentReady);
-
-  // Suppress spurious TTS error alerts during real navigation: awaitGeneration()
-  // checks closedManually and skips the alert. pagehide, not beforeunload:
-  // beforeunload also fires when the page stays (a link that turns into a
-  // download, Cancel on "Leave site?"), which would mute the rest of the read.
-  window.addEventListener("pagehide", () => { closedManually = true; });
-
   if (document.readyState !== "complete") {
     window.addEventListener("load", () => {
-      if (!isLoading && !isStreaming) {
+      if (extensionEnabled && !isLoading && !isStreaming) {
         estimatePageDuration();
         updatePlayer();
       }
@@ -1499,4 +1560,4 @@ async function init() {
   }
 }
 
-init();
+initPromise = init();
